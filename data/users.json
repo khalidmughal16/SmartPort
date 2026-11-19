@@ -1,0 +1,37 @@
+[
+  {
+    "n": "Demo Admin",
+    "e": "admin@smartport.pk",
+    "r": "A",
+    "salt": "3d6c6185119b0603bd21859ad7a3dd4c",
+    "h": "479b100f3bc6c0b401525dd7aab9233d6483372430b44e44147bb980df781b36eef7f6c32074de4d616282115dfcb8ef89c8c1a7bb4ca0e704780ae4a052d637"
+  },
+  {
+    "n": "Demo Gate Officer",
+    "e": "gate@smartport.pk",
+    "r": "G",
+    "salt": "4abceeab767edb694e8c5d17417487a2",
+    "h": "b91f8f97a88943ad83ec0526d78f41e29c0c92749849de4b24cb2873f7455b940bc7aa4d6c1c9ef8f10880254277babb01c208e3104aaa04ef64f819470b2140"
+  },
+  {
+    "n": "Demo Yard Supervisor",
+    "e": "yard@smartport.pk",
+    "r": "Y",
+    "salt": "f4919b9367d961595a8500dfe36cf49f",
+    "h": "912aa612f2bfc5f9a99dacd00c735cbf2d06434aaa89d5b4fdd65c5a4e33daf0ba36874f422dec1fc143f71b76bb2531eb7deace38fc29196318954bb8f93f4d"
+  },
+  {
+    "n": "Demo Documentation Clerk",
+    "e": "docs@smartport.pk",
+    "r": "D",
+    "salt": "9efa16f552360d0234a498fee8abd84c",
+    "h": "9fa70738aefaa308ad6c1fc7cd73db975538f984825a72d07d6420f182d898dc6364c2e2f74ed87b12d74f9cf75b8886a1c39f00c74f8e8512d7d8a9790b5ba0"
+  },
+  {
+    "n": "Demo Billing Clerk",
+    "e": "billing@smartport.pk",
+    "r": "B",
+    "salt": "62233cb8f1565e629aebd1c027a7d29c",
+    "h": "ed9104de4d0032e3d303e4b28fd3f38b716eb2b353b784bf49264c6e3af6c379f1fc53c67bb814375ca77fb7f365a2e176a7db6b11de9b84eb7172dc2a29933b"
+  }
+]

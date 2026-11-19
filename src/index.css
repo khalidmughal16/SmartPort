@@ -1,0 +1,17 @@
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --border: 0 0% 100% / 0.1; --input: 0 0% 100% / 0.1; --ring: 84 85% 60%;
+  --foreground: 0 0% 100%; --muted-foreground: 0 0% 100% / 0.4;
+  --primary: 0 0% 100%; --primary-foreground: 0 0% 0%; --destructive: 0 84% 60%;
+}
+
+/* Minimal preflight for Tailwind-built components. :where() keeps specificity at 0 so utilities still win. */
+:where(.tw-root) *, :where(.tw-root) *::before, :where(.tw-root) *::after { box-sizing: border-box; border: 0 solid rgba(255,255,255,.12); }
+:where(.tw-root) h1, :where(.tw-root) h2, :where(.tw-root) h3, :where(.tw-root) p, :where(.tw-root) dl, :where(.tw-root) dd { margin: 0; }
+:where(.tw-root) h1, :where(.tw-root) h2, :where(.tw-root) h3 { font-size: inherit; font-weight: inherit; }
+:where(.tw-root) button { background: transparent; padding: 0; cursor: pointer; }
+:where(.tw-root) img, :where(.tw-root) svg { display: block; }
+:where(.tw-root) img { max-width: 100%; height: auto; }
+:where(.tw-root) input { font: inherit; }
