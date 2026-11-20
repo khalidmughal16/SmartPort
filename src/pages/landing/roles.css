@@ -1,4 +1,0 @@
-/* Role cards on the landing page (Tailwind-built cards inside the legacy .gr grid). */
-#roles .gr a { display: block; padding: 0; border: 0; background: none; border-radius: 0; }
-#roles { background: linear-gradient(rgba(10,11,10,.78), rgba(10,11,10,.92)), url(/assets/scene-08.jpg) center/cover fixed; }
-#roles #rg { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; }
