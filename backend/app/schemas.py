@@ -48,6 +48,7 @@ class ContainerIn(BaseModel):
     zone: Zone = "General"
     consignee: Optional[str] = Field(default=None, max_length=80)
     leave: Optional[int] = Field(default=None, description="Planned pick-up time, ms since epoch")
+    weight: Optional[int] = Field(default=None, ge=0, le=100000, description="Gross weight in kg (optional)")
 
 
 class ImportIn(BaseModel):
@@ -61,11 +62,8 @@ class IdsIn(BaseModel):
 class SuggestIn(BaseModel):
     zone: Zone = "General"
     leave: Optional[int] = None
-
-
-class TaskIn(BaseModel):
-    text: str = Field(min_length=3, max_length=120)
-    p: int = Field(ge=1, le=9, default=3)
+    size: str = Field(default="40 ft", max_length=20)
+    weight: Optional[int] = Field(default=None, ge=0, le=100000)
 
 
 class VesselIn(BaseModel):
@@ -80,10 +78,6 @@ class CheckInIn(BaseModel):
     truck: str = Field(min_length=1, max_length=20)
     size: str = "40 ft"
     zone: Zone = "General"
-
-
-class RouteIn(BaseModel):
-    obstacles: Optional[list[bool]] = Field(default=None, description="60 cells (10x6 grid); omit for a random map")
 
 
 class ShipmentIn(BaseModel):

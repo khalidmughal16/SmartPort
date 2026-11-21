@@ -1,4 +1,4 @@
-import { BAYS, Container, DAY, MAX_TIER, YARD_BLOCKS, Zone, rnd } from './data'
+import { Container, DAY, MAX_TIER, YARD_BLOCKS, Zone, rnd } from './data'
 /** Whole days a container has been in the terminal (until release, if released). */
 export const dwell = (c: Container, now = Date.now()) => Math.max(0, Math.floor(((c.rel ?? now) - c.at) / DAY))
 /** Storage dues: 5 free days, then $45 per day. */
@@ -19,7 +19,7 @@ export function suggest(C: Container[], leave: number | undefined, zone: Zone): 
   let best: (Suggestion & { len: number }) | null = null
   for (const b of YARD_BLOCKS) {
     if (b.zone !== zone) continue
-    for (let bay = 0; bay < BAYS; bay++) {
+  for (let bay = 0; bay < b.stacks; bay++) {
       const s = stackAt(C, b.id, bay)
       if (s.length >= MAX_TIER) continue
       const e = s.filter((x) => (x.leave ?? Infinity) < lv).length

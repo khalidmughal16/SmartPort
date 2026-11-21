@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { P, R, Role, staffPages, YARD_BLOCKS, BAYS } from '../lib/data'
+import { P, R, Role, staffPages, YARD_BLOCKS } from '../lib/data'
 import { due, dwell, perWeekday, stackAt } from '../lib/logic'
 import { actions, useStore } from '../lib/store'
 import { Bars, Pill, Table } from '../components/ui'
@@ -27,7 +27,7 @@ export function Reports() {
   // Expected extra crane moves: containers stacked above one that leaves earlier.
   const extra = YARD_BLOCKS.map((b): [string, number] => {
     let n = 0
-    for (let bay = 0; bay < BAYS; bay++) {
+   for (let bay = 0; bay < b.stacks; bay++) {
       const st = stackAt(C, b.id, bay)
       st.forEach((c, i) => { if (c.leave) n += st.slice(i + 1).filter((x) => (x.leave ?? Infinity) > (c.leave as number)).length })
     }

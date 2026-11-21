@@ -450,12 +450,12 @@ main h2{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:clamp(24p
 .yg{display:grid;gap:10px;padding:12px;border-radius:14px;background:color-mix(in srgb,var(--fg) 5%,var(--card));border:1px solid var(--ln)}
 .yb{display:grid;grid-template-columns:44px 1fr;gap:8px;align-items:stretch}
 .ybl{display:grid;place-items:center;border-radius:8px;background:var(--ln);font:700 15px 'Inter Tight',sans-serif}
-.ybr{display:grid;grid-template-columns:repeat(10,1fr);gap:6px}
+.ybr{display:grid;grid-template-columns:repeat(var(--n,10),minmax(0,110px));gap:6px}
 .yc{position:relative;display:flex;flex-direction:column-reverse;gap:2px;min-height:64px;padding:3px;border-radius:6px;border:1px solid var(--ln);background:var(--card);cursor:pointer}
 .yc i{display:block;flex:1;border-radius:3px;background:color-mix(in srgb,var(--fg) 7%,transparent)}.yc i.o{background:var(--zc)}
 .yc.on{outline:2px solid var(--lime);outline-offset:1px;z-index:3}.yc.mk{outline:2px dashed var(--lime);outline-offset:1px;animation:pl 1.2s infinite}
 div.yc{cursor:default}.yc:not(.f):hover{border-color:var(--zc)}
-.yg.sm{gap:5px;padding:8px}.yg.sm .yb{grid-template-columns:26px 1fr;gap:5px}.yg.sm .ybl{font-size:11px}.yg.sm .ybr{gap:3px}.yg.sm .yc{min-height:30px;padding:2px;gap:1px;border-radius:4px}
+.yg.sm{gap:5px;padding:8px}.yg.sm .yb{grid-template-columns:26px 1fr;gap:5px}.yg.sm .ybl{font-size:11px}.yg.sm .ybr{gap:3px;grid-template-columns:repeat(var(--n,10),minmax(0,56px))}.yg.sm .yc{min-height:30px;padding:2px;gap:1px;border-radius:4px}
 .ytt{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);display:grid;gap:2px;min-width:150px;padding:10px 12px;border-radius:10px;background:#0E100F;color:#F2F4F3;border:1px solid rgba(255,255,255,.18);box-shadow:0 12px 30px rgba(0,0,0,.4);text-align:left;z-index:9;pointer-events:none}
 .ytt b{font:700 15px 'Inter Tight',sans-serif}.ytt small{color:rgba(242,244,243,.7);font-size:12px}
 :root[data-theme=light] .ytt{background:#fff;color:#0B1B3A;border-color:var(--ln)}:root[data-theme=light] .ytt small{color:var(--mut)}

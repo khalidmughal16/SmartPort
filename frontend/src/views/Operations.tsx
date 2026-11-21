@@ -1,7 +1,7 @@
 'use client'
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { BAYS, CAPACITY, Container, MAX_TIER, YARD_BLOCKS, ZONES, Zone } from '../lib/data'
+import { CAPACITY, Container, FREE_DAYS, MAX_TIER, YARD_BLOCKS, ZONES, Zone } from '../lib/data'
 import { ago, dwell, inYard, perWeekday, stackAt, Suggestion } from '../lib/logic'
 import { actions, toast, useStore } from '../lib/store'
 import { Bars, Icon, Pill, Table } from '../components/ui'
@@ -24,8 +24,8 @@ export function YardGrid({ C, compact, sel, mark, onPick }: {
       {YARD_BLOCKS.map((b) => (
         <div className="yb" key={b.id}>
           <span className="ybl">{b.id}</span>
-          <div className="ybr">
-            {Array.from({ length: BAYS }, (_, bay) => {
+          <div className="ybr" style={{ ["--n" as string]: b.stacks }}>
+            {Array.from({ length: b.stacks }, (_, bay) => {
               const s = stackAt(C, b.id, bay)
               const on = sel?.block === b.id && sel.bay === bay, mk = mark?.block === b.id && mark.bay === bay
               const cls = `yc z${b.zone[0]} ${s.length ? 'f' : ''} ${on ? 'on' : ''} ${mk ? 'mk' : ''}`
@@ -33,11 +33,11 @@ export function YardGrid({ C, compact, sel, mark, onPick }: {
               if (compact || !onPick) return <div key={bay} className={cls}>{inner}</div>
               const top = s[s.length - 1]
               return (
-                <button key={bay} className={cls} aria-label={`${b.id} bay ${bay + 1}: ${s.length} of ${MAX_TIER} containers`} onClick={() => onPick(b.id, bay)}>
+                <button key={bay} className={cls} aria-label={`${b.id} stack ${bay + 1}: ${s.length} of ${MAX_TIER} containers`} onClick={() => onPick(b.id, bay)}>
                   {inner}
                   {on && (
                     <span className="ytt" role="status">
-                      {top ? <><b>{top.id}</b><small>{top.size} &bull; In yard</small><small>Stack: {bay + 1} &bull; Tier: {top.tier! + 1}</small></> : <><b>{b.id} &bull; bay {bay + 1}</b><small>Empty stack</small></>}
+                      {top ? <><b>{top.id}</b><small>{top.size} &bull; In yard</small><small>Stack: {bay + 1} &bull; Tier: {top.tier! + 1}</small></> : <><b>{b.id} &bull; stack {bay + 1}</b><small>Empty stack</small></>}
                     </span>
                   )}
                 </button>
@@ -102,7 +102,7 @@ export function Dashboard() {
   const yard = inYard(C)
   const now = Date.now()
   const pct = Math.round((yard.length / CAPACITY) * 100)
-  const overdue = live.filter((c) => dwell(c, now) > 5).length
+  const overdue = live.filter((c) => dwell(c, now) > FREE_DAYS).length
   const todayIn = C.filter((c) => new Date(c.at).toDateString() === new Date(now).toDateString()).length
   const hold = live.filter((c) => c.cus === 'Hold').length
   const share = (z: Zone) => (yard.length ? Math.round((yard.filter((c) => c.zone === z).length / yard.length) * 100) : 0)
@@ -191,8 +191,9 @@ export function YardMap() {
   const [msg, setMsg] = useState('')
   const blk = YARD_BLOCKS.find((b) => b.id === sel?.block) ?? YARD_BLOCKS[0]
   const zb = YARD_BLOCKS.filter((b) => b.zone === blk.zone)
-  const used = zb.reduce((n, b) => n + Array.from({ length: BAYS }, (_, i) => stackAt(C, b.id, i).length).reduce((a, c) => a + c, 0), 0)
-  const cap = Math.round((used / (zb.length * BAYS * MAX_TIER)) * 100)
+  const nStacks = zb.reduce((n, b) => n + b.stacks, 0)
+  const used = zb.reduce((n, b) => n + Array.from({ length: b.stacks }, (_, i) => stackAt(C, b.id, i).length).reduce((a, c) => a + c, 0), 0)
+  const cap = Math.round((used / (nStacks * MAX_TIER)) * 100)
   const find = () => {
     const c = C.find((x) => x.id === q.trim().toUpperCase() && x.st === 'In yard')
     if (!c) { setMsg('Not in the yard: ' + (q.trim() || 'enter a number')); return }
@@ -200,8 +201,8 @@ export function YardMap() {
   }
   const sug = async () => {
     const s: Suggestion | null = await actions.suggestSlot(zone)
-    if (!s) { setMsg('No free slot left in the ' + zone + ' zone.'); setMark(null); return }
-    setMark({ block: s.block, bay: s.bay }); setSel(null); setMsg(`Best slot: ${s.block}, bay ${s.bay + 1}, tier ${s.tier + 1}`)
+    if (!s) { setMsg('No valid stack is free in the ' + zone + ' zone.'); setMark(null); return }
+    setMark({ block: s.block, bay: s.bay }); setSel(null); setMsg(`Best slot: ${s.block}, stack ${s.bay + 1}, tier ${s.tier + 1}`)
   }
   return (
     <div className="ym">
@@ -218,7 +219,7 @@ export function YardMap() {
           <b><Icon d={PATHS.box} cls="ic in" /> {blk.zone} Zone</b>
           <dl className="zi">
             <dt>Blocks</dt><dd>{zb.map((b) => b.id).join(', ')}</dd>
-            <dt>Stacks</dt><dd>{zb.length * BAYS}</dd>
+            <dt>Stacks</dt><dd>{nStacks}</dd>
             <dt>Capacity</dt><dd>{cap}%</dd>
           </dl>
           <div className="pb"><i style={{ width: cap + '%' }} /></div>

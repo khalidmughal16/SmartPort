@@ -32,9 +32,8 @@ const rows: [string, string, string, string, string][] = [
   ['containers', 'Containers', 'Operations', 'AGY', 'Track inventory and movements'],
   ['vessels', 'Inbound Vessels', 'Operations', 'AGY', 'Arrivals, schedules and manifests'],
   ['gate-in', 'Gate-In', 'Gate', 'AG', 'Check in trucks and cargo'],
-  ['appointments', 'Appointments', 'Gate', 'AG', 'Keep the gate moving'],
+  ['appointments', 'Appointments', 'Gate', 'AG', 'Upcoming appointments, earliest first'],
   ['placement', 'Placement', 'Yard', 'AY', 'Put every container in its place'],
-  ['crane-tasks', 'Crane Tasks', 'Yard', 'AY', 'Prioritise your next move'],
   ['customs-billing', 'Customs and Billing', 'Finance', 'ADB', 'Clear documents, dues and release'],
   ['reports', 'Reports', 'Finance', 'AB', 'Turn terminal data into decisions'],
   ['users', 'Users and Settings', 'Admin', 'A', 'People, permissions and preferences'],
@@ -47,13 +46,17 @@ export const homeOf = (r: Role) => (r === 'C' ? 'overview' : 'dashboard')
 
 export type Zone = 'General' | 'Hazardous' | 'Refrigerated'
 export const ZONES: Zone[] = ['General', 'Hazardous', 'Refrigerated']
-/** Yard layout: each block has BAYS stacks, each stack holds up to MAX_TIER containers. Edit to match your terminal. */
-export const YARD_BLOCKS: { id: string; zone: Zone }[] = [
-  { id: 'A1', zone: 'General' }, { id: 'A2', zone: 'General' }, { id: 'H1', zone: 'Hazardous' }, { id: 'R1', zone: 'Refrigerated' },
+/** Yard layout (same as the backend): 4 blocks, 10 stacks in total, up to 4 tiers per stack = 40 locations. */
+export const YARD_BLOCKS: { id: string; zone: Zone; stacks: number }[] = [
+  { id: 'A1', zone: 'General', stacks: 3 }, { id: 'A2', zone: 'General', stacks: 3 }, { id: 'H1', zone: 'Hazardous', stacks: 2 }, { id: 'R1', zone: 'Refrigerated', stacks: 2 },
 ]
-export const BAYS = 10
 export const MAX_TIER = 4
-export const CAPACITY = YARD_BLOCKS.length * BAYS * MAX_TIER
+export const STACKS = YARD_BLOCKS.reduce((n, b) => n + b.stacks, 0)
+export const CAPACITY = STACKS * MAX_TIER
+/** Free storage days before charges start (the backend sends the actual figure with every container). */
+export const FREE_DAYS = 3
+/** Amounts are PKR. */
+export const pkr = (n: number) => 'PKR ' + Math.round(n).toLocaleString('en-US')
 export const DAY = 86400000
 
 export interface Container {
@@ -64,9 +67,11 @@ export interface Container {
   leave?: number        // planned pick-up time (ms), optional
   rel?: number          // release time (ms)
   consignee?: string; bk?: boolean
+  weight?: number       // kg, optional
+  // billing figures computed by the server (PKR): 3 free days, then chargeable days x tariff (size and cargo type)
+  dwell?: number; free_days?: number; chargeable_days?: number; rate?: number; dues?: number; settled?: boolean
 }
 export interface Vessel { id: string; name: string; eta: number; boxes: number; berth: string }
-export interface Task { id: string; text: string; p: number }
 export interface LogEntry { t: number; kind: string; id?: string; m: string }
 export interface Booking { id: string; t: string; d: string; s: string; bid?: number }
 export interface User {
@@ -95,14 +100,14 @@ export const STORY: string[][] = [
   ['Crossing land.', 'Straight to the dry port.', 'Rail and truck shuttles carry cargo inland, so the seaport stays clear.', 'In transit', 'Rail shuttle', '0', '0'],
   ['At the gate.', 'Checked in, seconds.', 'The gate officer records the truck, the driver and the container, then lifts the barrier.', 'At gate', 'Gate 2', '0', '0'],
   ['Cleared,', 'not stuck.', 'Documents are verified and the hold clears. Nothing leaves without customs clearance and cleared dues.', 'Customs', 'Customs desk', '0', '1'],
-  ['Buried', 'by chaos.', 'Stack it wrong and every pickup costs extra crane moves.', 'Buried', 'Bay 3, tier 1', '', '2'],
+  ['Buried', 'by chaos.', 'Stack it wrong and every pickup costs extra moves.', 'Buried', 'Bay 3, tier 1', '', '2'],
   ['Placed', 'by logic.', 'The optimizer scores every free slot and picks the one that blocks nothing.', 'Slot assigned', 'Bay 7, tier 2', '', '2'],
   ['A clear', 'lane ahead.', 'The crane lifts along a lane with nothing in its way, so the truck is never held up.', 'Lane clear', 'Yard lane 2', '0', '3'],
-  ['First', 'in line.', 'Pickups wait in a priority queue, so urgent trucks are served first.', 'Queued, P1', 'Bay 7, tier 2', '0', '4'],
-  ['Paid', 'in full.', 'Free days, then a daily storage charge. Dues clear and the release is approved.', 'Release ok', 'Billing', '0', '5'],
+  ['First', 'in line.', 'Appointments are handled in time order, so the earliest pickup is served first.', 'Next in line', 'Bay 7, tier 2', '0', '4'],
+  ['Paid', 'in full.', 'Three free days, then a daily storage charge in PKR. Dues clear and the release is approved.', 'Release ok', 'Billing', '0', '5'],
   ['Out', 'the gate.', 'Container GMT-0042 leaves with the customer. Every move was connected.', 'Released', 'Gate-out', '0', '5'],
 ]
 export const CHIPS = [
   'Berth B-3 · vessel arriving', 'Rail shuttle · inland', 'Gate 2 · check-in', 'Customs · documents', 'Yard · bay 3',
-  'Optimizer · best slot', 'Crane · clear lane', 'Queue · priority P1', 'Billing · dues clear', 'Gate-out · released',
+  'Optimizer · best slot', 'Yard · clear lane', 'Appointments · earliest first', 'Billing · dues clear', 'Gate-out · released',
 ]

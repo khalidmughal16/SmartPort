@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { Booking, Container, LogEntry, P, Role, Task, User, Vessel, Zone, homeOf, initialSlots } from './data'
+import { Booking, Container, LogEntry, P, Role, User, Vessel, Zone, homeOf, initialSlots } from './data'
 import { ApiError, api, getToken, setToken } from './api'
 import { Suggestion, settled } from './logic'
 
@@ -7,7 +7,7 @@ export type Drawer = { kind: 'detail'; i: number } | { kind: 'ticket'; i: number
 
 /** Everything the terminal shows. The SERVER is the source of truth: this is a cache of GET /api/state. */
 export interface TerminalData {
-  C: Container[]; tasks: Task[]; vessels: Vessel[]; log: LogEntry[]
+  C: Container[]; appointments: Appointment[]; vessels: Vessel[]; log: LogEntry[]
   slots: [string, number][]; AD: number
 }
 export interface State extends TerminalData {
@@ -24,7 +24,7 @@ const read = <T,>(key: string, fallback: T): T => {
 }
 const session = read<{ role?: Role; user?: User } | null>('sp', null)
 
-const emptyData = (): TerminalData => ({ C: [], tasks: [], vessels: [], log: [], slots: initialSlots(), AD: 0 })
+const emptyData = (): TerminalData => ({ C: [], appointments: [], vessels: [], log: [], slots: initialSlots(), AD: 0 })
 
 let state: State = {
   role: getToken() ? session?.role ?? null : null, user: getToken() ? session?.user ?? null : null, next: null, users: [],
@@ -49,8 +49,10 @@ export const toast = (msg: string, bad = false) => {
 /* ------------------------------------------------------------------ server mapping */
 interface ApiUser { id: number; name: string; email: string; role: Role; company?: string; watch?: string[] }
 interface ApiBooking { bid: number; id: string; t: string; d: string; s: string }
+/** An upcoming appointment, in time order (earliest first), from the server's min-heap. */
+export interface Appointment extends ApiBooking { client?: string }
 interface ApiState {
-  role: Role; containers: Container[]; bookings?: ApiBooking[]; tasks?: Task[]; vessels?: Vessel[]; log?: LogEntry[]
+  role: Role; containers: Container[]; bookings?: ApiBooking[]; appointments?: Appointment[]; vessels?: Vessel[]; log?: LogEntry[]
   slots?: [string, number][]; day?: number; users?: ApiUser[]
 }
 const toUser = (u: ApiUser, slots: Booking[] = []): User => ({ n: u.name, e: u.email, p: '', r: u.role, co: u.company || '', watch: u.watch || [], slots })
@@ -70,7 +72,7 @@ export async function refresh(): Promise<void> {
     const bookings: Booking[] = (s.bookings || []).map((b) => ({ id: b.id, t: b.t, d: b.d, s: b.s, bid: b.bid }))
     const watch = s.role === 'C' ? s.containers.map((c) => c.id) : undefined
     set({
-      C: s.containers.map(clean), tasks: s.tasks || [], vessels: s.vessels || [], log: s.log || [],
+      C: s.containers.map(clean), appointments: s.appointments || [], vessels: s.vessels || [], log: s.log || [],
       slots: s.slots && s.slots.length ? s.slots : initialSlots(), users: (s.users || []).map((u) => toUser(u)),
       user: state.user && s.role === 'C' ? { ...state.user, slots: bookings, watch: watch ?? state.user.watch } : state.user, online: true,
     })
@@ -118,8 +120,8 @@ const nextFor = (r: Role) => {
 const norm = (v: string) => v.trim().toUpperCase()
 const idOf = (i: number) => state.C[i]?.id
 
-export interface NewContainer { id: string; size: string; zone: Zone; consignee?: string; leave?: number }
-const body = (f: NewContainer) => ({ id: norm(f.id), size: f.size, zone: f.zone, consignee: f.consignee?.trim() || null, leave: f.leave ?? null })
+export interface NewContainer { id: string; size: string; zone: Zone; consignee?: string; leave?: number; weight?: number }
+const body = (f: NewContainer) => ({ id: norm(f.id), size: f.size, zone: f.zone, consignee: f.consignee?.trim() || null, leave: f.leave ?? null, weight: f.weight ?? null })
 
 export const actions = {
   /** Resolves to an error message, or the page to open after signing in. */
@@ -169,10 +171,10 @@ export const actions = {
     toast(r.added + ' containers imported')
     return r.added
   },
-  /** Asks the server for the best slot (nothing is changed). Resolves to null when the zone is full or the call failed. */
-  async suggestSlot(zone: Zone, leave?: number): Promise<Suggestion | null> {
+  /** Asks the server for the best slot (nothing is changed). Resolves to null when no valid stack is free or the call failed. */
+  async suggestSlot(zone: Zone, leave?: number, size = '40 ft', weight?: number): Promise<Suggestion | null> {
     try {
-      return await api<Suggestion>('/api/yard/suggest', { body: { zone, leave: leave ?? null } })
+      return await api<Suggestion>('/api/yard/suggest', { body: { zone, leave: leave ?? null, size, weight: weight ?? null } })
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) return null
       if (e instanceof ApiError && e.status === 401) { actions.signOut(); toast('Your session ended. Please sign in again.', true); return null }
@@ -209,13 +211,6 @@ export const actions = {
     if (id) await call('/api/containers/' + encodeURIComponent(id) + '/release', { method: 'POST', body: {} }, id + ' released')
   },
 
-  /* crane tasks */
-  async addTask(text: string, p: number) {
-    if (!text.trim()) return toast('Describe the task.', true)
-    await call('/api/tasks', { body: { text: text.trim(), p } })
-  },
-  async escalate(id: string) { await call('/api/tasks/' + id + '/escalate', { method: 'POST', body: {} }) },
-  async finishTask(id: string) { await call('/api/tasks/' + id + '/done', { method: 'POST', body: {} }) },
 
   /* vessels */
   async addVessel(v: Omit<Vessel, 'id'>): Promise<boolean> {
@@ -232,6 +227,8 @@ export const actions = {
     if (s[1] >= 3) return toast('Slot full: three trucks per slot.', true)
     await call('/api/gate/slots/' + state.AD + '/' + s[0] + '/book', { method: 'POST', body: {} }, 'Booked ' + s[0])
   },
+  /** Takes the earliest upcoming appointment off the server's min-heap (it has been handled at the gate). */
+  async handleNextAppointment() { await call<Appointment>('/api/appointments/next', { method: 'POST', body: {} }, 'Next appointment handled') },
   async setDay(i: number) { set({ AD: i }); lastSync = ''; await refresh() },
 
   /* client portal */

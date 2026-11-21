@@ -28,9 +28,8 @@ Data shapes (see `Store.to_json()` in `app/store.py`):
 | Collection | Key | Fields |
 |---|---|---|
 | users | id | name, email (unique), password (PBKDF2 hash, keep as is), role (A/G/Y/D/B/C), company |
-| containers | id (container number) | size, zone (General/Hazardous/Refrigerated), cus (Hold/Cleared), paid, st (Pending/In yard/Released), block, bay, tier, slot, at, leave, rel (all times in ms since epoch), consignee, bk |
-| yard | block + bay | ordered list of (container id, leave ms): the stack, bottom first |
-| tasks | id | text, p (priority 1-9) |
+| containers | id (container number) | size, zone (General/Hazardous/Refrigerated), weight (kg, optional), cus (Hold/Cleared), paid, st (Pending/In yard/Released), block, bay, tier, slot, at, leave, rel (all times in ms since epoch), consignee, bk |
+| yard | block + stack | ordered list of (container id, leave ms, length, weight): the stack, bottom first. 10 stacks, 4 tiers |
 | vessels | id | name, eta (ms), boxes, berth |
 | log | (t, kind) | t (ms), kind, id (container, optional), m (message); newest first, capped at 100 |
 | slots | day (0-6) + time | booked count (capacity is 3 per slot) |

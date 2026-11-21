@@ -1,16 +1,26 @@
-"""Stack + YardStacks: the container yard modelled as 8 bays, each bay a stack (max 4 tiers high).
+"""Stack + YardGrid: the container yard.
 
-A container can only leave when it is on top. Each stack item is the day its container will leave, so
-placing a container on top of one that leaves *earlier* creates a blocker (an "extra crane move" later).
+Layout (matches the approved seed data): 4 yard blocks, 10 stacks in total, up to 4 tiers per stack = 40 locations.
+Every stack is a LIFO Stack: a container can only leave when it is on top, so placing one on top of a container
+that leaves *earlier* creates a blocker (an extra move later).
+
+Placement rules (PLC-3 / PLC-4), see YardGrid.suggest():
+  1. Keep only valid stacks: matching zone, free height, same container length (20 / 40 / 45 ft), and no
+     heavier container on top of a lighter one.
+  2. Prefer a stack whose top container leaves on the same day or later than the new container.
+  3. Among those, choose the closest leaving date after the new container's leaving date.
+  4. If tied, choose the stack with fewer containers.
+  5. If no suitable stack exists, choose the valid stack with the fewest earlier-leaving blockers.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from typing import Generic, Iterator, Optional, TypeVar
+from typing import Generic, Iterator, NamedTuple, Optional, TypeVar
 
 T = TypeVar("T")
-MAX_TIERS = 4
 INF = float("inf")
+DAY_MS = 86_400_000
 
 
 class Stack(Generic[T]):
@@ -42,123 +52,107 @@ class Stack(Generic[T]):
         return list(self._a)
 
 
-@dataclass
-class Suggestion:
-    col: int          # bay index, 0-based
-    tier: int         # tier the container will sit on, 0-based
-    extra_moves: int  # containers underneath that leave earlier (blockers)
-    zone: str
-
-    def as_dict(self) -> dict:
-        return {"col": self.col, "tier": self.tier, "extra_moves": self.extra_moves, "zone": self.zone,
-                "bay": self.col + 1, "tier_no": self.tier + 1}
-
-
-class YardStacks:
-    """A row of bays. suggest() is O(bays * height); place() is O(1)."""
-
-    def __init__(self, bays: Optional[list[list[int]]] = None, n_bays: int = 8, labels: Optional[list[list[Optional[str]]]] = None) -> None:
-        self.bays: list[Stack[int]] = [Stack(b) for b in bays] if bays else [Stack() for _ in range(n_bays)]
-        # container number sitting at each tier (None for anonymous demo containers); parallel to self.bays
-        self.labels: list[list[Optional[str]]] = labels or [[None] * len(b) for b in self.bays]
-
-    def extra_moves(self, col: int, leave_day: int) -> int:
-        """How many containers already in the bay leave before this one (they would be blocked)."""
-        return sum(1 for x in self.bays[col] if x < leave_day)
-
-    def suggest(self, leave_day: int, hazard: bool = False) -> Optional[Suggestion]:
-        """Best free bay: fewest blockers, ties broken by the shorter stack. None if every bay is full."""
-        best: Optional[tuple[int, int, int]] = None  # (extra, height, col)
-        for col, s in enumerate(self.bays):
-            if len(s) >= MAX_TIERS:
-                continue
-            cand = (self.extra_moves(col, leave_day), len(s), col)
-            if best is None or cand < best:
-                best = cand
-        if best is None:
-            return None
-        extra, height, col = best
-        return Suggestion(col, height, extra, "Hazard zone" if hazard else "Standard zone")
-
-    def place(self, col: int, leave_day: int, container_id: Optional[str] = None) -> Suggestion:
-        if not 0 <= col < len(self.bays):
-            raise ValueError("no such bay")
-        if len(self.bays[col]) >= MAX_TIERS:
-            raise ValueError("bay is full")
-        s = Suggestion(col, len(self.bays[col]), self.extra_moves(col, leave_day), "Standard zone")
-        self.bays[col].push(leave_day)
-        self.labels[col].append(container_id)
-        return s
-
-    def heights(self) -> list[int]:
-        return [len(b) for b in self.bays]
-
-    def to_lists(self) -> list[list[int]]:
-        return [b.to_list() for b in self.bays]
-
-
-# ---------------------------------------------------------------------------------------------------------------
-# YardGrid: the real terminal layout used by the frontend: blocks (A1, A2, H1, R1) x 10 bays x up to 4 tiers.
-# Every (block, bay) is a Stack of (container_id, leave_ms). A container can only leave when it is on top, so
-# placing one on top of a container that leaves *earlier* creates a blocker (an extra crane move later).
-# ---------------------------------------------------------------------------------------------------------------
-YARD_BLOCKS: list[tuple[str, str]] = [("A1", "General"), ("A2", "General"), ("H1", "Hazardous"), ("R1", "Refrigerated")]
-BAYS = 10
+# (block, zone, number of stacks). 4 blocks, 10 stacks. Edit here if the approved seed data changes.
+YARD_LAYOUT: list[tuple[str, str, int]] = [("A1", "General", 3), ("A2", "General", 3), ("H1", "Hazardous", 2), ("R1", "Refrigerated", 2)]
 MAX_TIER = 4
+
+
+def length_of(size: Optional[str]) -> Optional[int]:
+    """'40 ft HC' -> 40. Containers of different lengths are never stacked together."""
+    m = re.match(r"\s*(\d+)", size or "")
+    return int(m.group(1)) if m else None
+
+
+def day_of(ms: Optional[float]) -> float:
+    """Leaving day number. No planned date means it leaves last (infinity)."""
+    return INF if ms is None or ms == INF else ms // DAY_MS
+
+
+class Item(NamedTuple):
+    cid: str
+    leave: float          # ms since epoch, INF when unknown
+    length: Optional[int]  # 20 / 40 / 45
+    weight: Optional[float]  # kg, None when unknown
 
 
 @dataclass
 class Placement:
     block: str
-    bay: int      # 0-based
+    bay: int      # 0-based stack number inside the block
     tier: int     # 0-based
-    extra: int    # containers underneath that leave earlier
+    extra: int    # containers underneath that leave earlier (blockers)
     zone: str
+    reason: str = ""
 
     @property
     def slot(self) -> str:
         return f"{self.block}-B{self.bay + 1}-T{self.tier + 1}"
 
     def as_dict(self) -> dict:
-        return {"block": self.block, "bay": self.bay, "tier": self.tier, "e": self.extra, "zone": self.zone, "slot": self.slot}
+        return {"block": self.block, "bay": self.bay, "tier": self.tier, "e": self.extra, "zone": self.zone, "slot": self.slot, "reason": self.reason}
 
 
 class YardGrid:
-    """suggest() is O(blocks x bays x height); place() is O(1); remove() is O(height)."""
+    """suggest() is O(stacks x height); place() is O(1); remove() is O(height)."""
 
-    def __init__(self, blocks: Optional[list[tuple[str, str]]] = None, bays: int = BAYS, max_tier: int = MAX_TIER) -> None:
-        self.blocks = list(blocks or YARD_BLOCKS)
-        self.bays, self.max_tier = bays, max_tier
-        self.stacks: dict[tuple[str, int], Stack[tuple[str, float]]] = {(b, i): Stack() for b, _ in self.blocks for i in range(bays)}
+    def __init__(self, layout: Optional[list[tuple[str, str, int]]] = None, max_tier: int = MAX_TIER) -> None:
+        self.layout = list(layout or YARD_LAYOUT)
+        self.blocks = [(b, z) for b, z, _ in self.layout]
+        self.n_stacks = {b: n for b, _, n in self.layout}
+        self.max_tier = max_tier
+        self.stacks: dict[tuple[str, int], Stack[Item]] = {(b, i): Stack() for b, _, n in self.layout for i in range(n)}
         self.where: dict[str, tuple[str, int]] = {}  # container id -> (block, bay), O(1) lookup
 
     @property
     def capacity(self) -> int:
-        return len(self.blocks) * self.bays * self.max_tier
+        return len(self.stacks) * self.max_tier
 
-    def suggest(self, zone: str, leave: Optional[float] = None) -> Optional[Placement]:
-        """Best stack in the matching zone: fewest blockers, ties broken by the shorter stack."""
-        lv = INF if leave is None else leave
-        best: Optional[tuple[int, int, Placement]] = None
+    # ------------------------------------------------------------------ rule 1: valid stacks
+    def is_valid(self, block_zone: str, s: Stack[Item], zone: str, length: Optional[int], weight: Optional[float]) -> bool:
+        if block_zone != zone or len(s) >= self.max_tier:
+            return False
+        if len(s):
+            bottom, top = next(iter(s)), s.peek()
+            if length is not None and bottom.length is not None and bottom.length != length:
+                return False                      # different container length
+            if weight is not None and top.weight is not None and weight > top.weight:
+                return False                      # a heavier container must not sit on a lighter one
+        return True
+
+    def suggest(self, zone: str, leave: Optional[float] = None, size: Optional[str] = None, weight: Optional[float] = None) -> Optional[Placement]:
+        length, nd = length_of(size), day_of(leave)
+        best_top: Optional[tuple[float, int, int, Placement]] = None   # rules 2-4
+        best_fb: Optional[tuple[int, int, Placement]] = None           # rule 5
         for block, z in self.blocks:
-            if z != zone:
-                continue
-            for bay in range(self.bays):
+            for bay in range(self.n_stacks[block]):
                 s = self.stacks[(block, bay)]
-                if len(s) >= self.max_tier:
+                if not self.is_valid(z, s, zone, length, weight):
                     continue
-                e = sum(1 for _, lv2 in s if lv2 < lv)
-                if best is None or (e, len(s)) < (best[0], best[1]):
-                    best = (e, len(s), Placement(block, bay, len(s), e, zone))
-        return best[2] if best else None
+                blockers = sum(1 for it in s if day_of(it.leave) < nd)
+                if len(s):
+                    td = day_of(s.peek().leave)
+                    if td >= nd:                                   # rule 2: top leaves the same day or later
+                        gap = 0 if td == nd else td - nd           # rule 3: closest leaving date
+                        key = (gap, len(s))                        # rule 4: fewer containers
+                        if best_top is None or key < best_top[:2]:
+                            why = ("The top container leaves the same day as this one." if gap == 0 else
+                                   "The top container leaves later than this one" + ("" if gap == INF else f" (closest match: {int(gap)} day{'s' if gap != 1 else ''} after)") + ".")
+                            best_top = (gap, len(s), bay, Placement(block, bay, len(s), blockers, zone, why))
+                fb = (blockers, len(s))
+                if best_fb is None or fb < best_fb[:2]:
+                    why = (f"No stack has a top container leaving the same day or later, so this stack has the fewest earlier-leaving containers ({blockers}).")
+                    best_fb = (blockers, len(s), Placement(block, bay, len(s), blockers, zone, why))
+        if best_top:
+            return best_top[3]
+        return best_fb[2] if best_fb else None
 
-    def place(self, block: str, bay: int, cid: str, leave: Optional[float] = None) -> int:
+    def place(self, block: str, bay: int, cid: str, leave: Optional[float] = None, size: Optional[str] = None, weight: Optional[float] = None) -> int:
         s = self.stacks.get((block, bay))
         if s is None:
             raise ValueError("no such stack")
         if len(s) >= self.max_tier:
             raise ValueError("stack is full")
-        s.push((cid, INF if leave is None else leave))
+        s.push(Item(cid, INF if leave is None else leave, length_of(size), weight))
         self.where[cid] = (block, bay)
         return len(s) - 1
 
@@ -168,26 +162,34 @@ class YardGrid:
         if loc is None:
             return None
         s = self.stacks[loc]
-        s._a = [x for x in s._a if x[0] != cid]
+        s._a = [x for x in s._a if x.cid != cid]
         return loc
 
     def ids(self, block: str, bay: int) -> list[str]:
-        return [c for c, _ in self.stacks[(block, bay)]]
+        return [it.cid for it in self.stacks[(block, bay)]]
 
     def heights(self) -> dict[str, list[int]]:
-        return {b: [len(self.stacks[(b, i)]) for i in range(self.bays)] for b, _ in self.blocks}
+        return {b: [len(self.stacks[(b, i)]) for i in range(n)] for b, _, n in self.layout}
 
     def used(self) -> int:
         return sum(len(s) for s in self.stacks.values())
 
     def to_dict(self) -> dict:
-        return {f"{b}:{i}": [[c, None if lv == INF else lv] for c, lv in s] for (b, i), s in self.stacks.items() if len(s)}
+        return {f"{b}:{i}": [[it.cid, None if it.leave == INF else it.leave, it.length, it.weight] for it in s] for (b, i), s in self.stacks.items() if len(s)}
 
     @classmethod
     def from_dict(cls, d: dict) -> "YardGrid":
+        """Rebuild from a snapshot. Stacks that no longer exist in the layout are skipped (the store re-queues those containers)."""
         g = cls()
         for key, items in d.items():
             b, i = key.split(":")
-            for cid, lv in items:
-                g.place(b, int(i), cid, lv)
+            if (b, int(i)) not in g.stacks:
+                continue
+            for row in items:
+                cid, lv = row[0], row[1]
+                length, weight = (row[2], row[3]) if len(row) >= 4 else (None, None)
+                s = g.stacks[(b, int(i))]
+                if len(s) < g.max_tier:
+                    s.push(Item(cid, INF if lv is None else lv, length, weight))
+                    g.where[cid] = (b, int(i))
         return g

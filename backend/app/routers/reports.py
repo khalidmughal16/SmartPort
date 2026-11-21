@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends
 
 from ..deps import require
-from ..dsa.billing import DAY_MS, dues
+from ..dsa.billing import DAY_MS, FREE_DAYS
 from ..dsa.simulation import compare
 from ..store import now_ms, store
 
@@ -31,9 +31,9 @@ async def dashboard():
     in_yard = [c for c in cs if c["st"] == "In yard"]
     return {
         "containers_in_yard": len(in_yard), "pending": sum(c["st"] == "Pending" for c in cs),
-        "past_free_days": sum(store.days_in(c) > 5 for c in in_yard), "over_7_days": sum(store.days_in(c) > 7 for c in in_yard),
+        "past_free_days": sum(store.days_in(c) > FREE_DAYS for c in in_yard), "over_7_days": sum(store.days_in(c) > 7 for c in in_yard),
         "customs_pending": sum(c["cus"] == "Hold" for c in cs if c["st"] != "Released"),
-        "storage_dues_open": sum(dues(store.days_in(c)) for c in cs if c["st"] != "Released" and not c["paid"]),
+        "storage_dues_open": sum(store.due_of(c) for c in cs if c["st"] != "Released" and not c["paid"]), "currency": "PKR",
         "occupancy_pct": round(100 * store.yard.used() / store.yard.capacity), "gate_queue": len(store.gate_queue),
         "gate_ins_per_weekday": _per_weekday([c["at"] for c in cs], now),
         "gate_outs_per_weekday": _per_weekday([c["rel"] for c in cs if c["rel"]], now),
@@ -42,14 +42,14 @@ async def dashboard():
 
 
 @router.get("/reports/placement", dependencies=[Depends(require("A", "B"))])
-async def placement_report(n: int = 32, seed: int | None = None):
-    """Random vs smart placement (8 bays x 4 tiers = at most 32 containers)."""
-    return compare(min(max(n, 1), 32), seed=seed)
+async def placement_report(n: int = 24, seed: int | None = None):
+    """Random vs approved placement rules (General zone: 6 stacks x 4 tiers = at most 24 containers)."""
+    return compare(min(max(n, 1), 24), seed=seed)
 
 
 @router.get("/reports/revenue", dependencies=[Depends(require("A", "B"))])
 async def revenue():
     cs = [c for c in store.containers.values() if c["st"] != "Pending"]
-    total = sum(dues(store.days_in(c)) for c in cs)
-    paid = sum(dues(store.days_in(c)) for c in cs if c["paid"])
-    return {"storage_accrued": total, "storage_collected": paid, "storage_open": total - paid}
+    total = sum(store.due_of(c) for c in cs)
+    paid = sum(store.due_of(c) for c in cs if c["paid"])
+    return {"currency": "PKR", "storage_accrued": total, "storage_collected": paid, "storage_open": total - paid}

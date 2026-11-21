@@ -48,10 +48,10 @@ async def book(body: BookingIn, u: dict = Depends(client)):
     c = get_container(body.container_id)
     if not _owns(u, c["id"]):
         raise HTTPException(403, "Add the container to your shipments first.")
-    if body.purpose == "Pickup" and not can_release(c["cus"], store.days_in(c), c["paid"]):
+    if body.purpose == "Pickup" and not can_release(c["cus"], store.due_of(c), c["paid"]):
         raise HTTPException(409, "Pickup needs customs cleared and dues paid.")
     b = {"id": store.new_id("booking"), "user_id": u["id"], "container_id": c["id"], "purpose": body.purpose, "date": body.date, "time_range": body.time_range}
-    store.bookings.append(b)
+    store.add_booking(b)  # also goes into the appointments min-heap
     if body.purpose == "Pickup":
         c["bk"] = True
     return booking_view(b)
@@ -59,7 +59,8 @@ async def book(body: BookingIn, u: dict = Depends(client)):
 
 @router.delete("/bookings/{booking_id}", status_code=204)
 async def cancel(booking_id: int, u: dict = Depends(client)):
-    store.bookings[:] = [b for b in store.bookings if not (b["id"] == booking_id and b["user_id"] == u["id"])]
+    if any(b["id"] == booking_id and b["user_id"] == u["id"] for b in store.bookings):
+        store.cancel_booking(booking_id)
 
 
 @router.post("/shipments/{cid}/pay")
@@ -67,7 +68,7 @@ async def pay(cid: str, u: dict = Depends(client)):
     c = get_container(cid)
     if not _owns(u, c["id"]):
         raise HTTPException(403, "That container is not in your shipments.")
-    if settled(store.days_in(c), c["paid"]):
+    if settled(store.due_of(c), c["paid"]):
         raise HTTPException(409, "Nothing to pay.")
     c["paid"] = True
     store.log_event("Payment", f"Payment received for {c['id']}", c["id"])

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .store import store
-from .routers import admin, auth, client, containers, gate, reports, route, state, tasks, vessels, yard
+from .routers import admin, appointments, auth, client, containers, gate, reports, state, vessels, yard
 
 
 @asynccontextmanager
@@ -29,7 +29,7 @@ async def autosave(request, call_next):
     return response
 
 
-for r in (auth, state, containers, yard, gate, tasks, vessels, route, reports, client, admin):
+for r in (auth, state, containers, yard, gate, appointments, vessels, reports, client, admin):
     app.include_router(r.router)
 
 

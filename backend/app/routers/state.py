@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..deps import ROLE_NAMES, current_user
 from ..store import store
+from .appointments import appointment_view
 from .client import booking_view
 from .gate import slot_rows
 
@@ -22,7 +23,7 @@ async def state(day: int = 0, u: dict = Depends(current_user)):
         return out
     out["containers"] = [store.view(c) for c in store.containers.values()]
     out["log"] = store.log
-    out["tasks"] = [store.task_view(store.tasks[k]) for k, _, _ in store.pq.ordered()] if r in ("A", "Y") else []
+    out["appointments"] = [appointment_view(b) for b in store.upcoming_appointments()] if r in ("A", "G") else []
     out["vessels"] = store.vessel_list() if r in ("A", "G", "Y") else []
     out["slots"] = slot_rows(day) if r in ("A", "G") else []
     out["day"] = day

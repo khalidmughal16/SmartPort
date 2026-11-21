@@ -12,7 +12,7 @@ docs@smartport.pk / Docs@123, billing@smartport.pk / Bill@123, client@smartport.
 ## Structure
 - `src/app/(site)`   root layout; `page.tsx` is the landing at `/`, `app/*` holds the app pages (/app/login, /app/dashboard ...)
 - `_old/`            unused files from earlier experiments (Vite App.tsx, three.js Landing, WorkflowTunnel); not part of the build
-- `src/components`   shell, auth, drawers, landing sections; `src/views` the 17 app views
+- `src/components`   shell, auth, drawers, landing sections; `src/views` the app views
 - `src/lib`          data, logic (dues, placement), store (state + actions), world (film SVG)
 
 ## Backend connection

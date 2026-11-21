@@ -22,17 +22,19 @@ The terminal starts **empty** (only the demo accounts exist). Add containers fro
 | `SMARTPORT_DATA` | `smartport_data.json` next to `app/` | where the JSON snapshot is written |
 | `SMARTPORT_CORS` | any `http://localhost:*` | regex of allowed frontend origins |
 
-## Where each data structure is used
-| Structure (file in `app/dsa/`) | Used for | Cost |
-|---|---|---|
-| `stack.py` `YardGrid` (stacks of Stack) | 4 blocks x 10 bays x 4 tiers; smart slot suggestion by pick-up time | place O(1), suggest O(slots) |
-| `priority_queue.py` max-heap (hand written) | crane tasks, escalate, dispatch | push/pop/update O(log n) |
-| `trie.py` Trie | container-number prefix search | O(L + k) |
-| `gate_queue.py` FIFO queue (deque) | trucks waiting at the gate | O(1) |
-| `astar.py` A* with `heapq` | shortest clear path on the 10x6 yard grid | O(V log V) |
-| `simulation.py` | random vs smart placement report | O(n x bays) |
-| `billing.py` | 5 free days, then $45/day, release rules | O(1) |
-| dicts (hash maps) in `store.py` | users by email, containers by number | O(1) lookup |
+## Project rules this backend follows
+| Rule | Where |
+|---|---|
+| Yard: 4 blocks (A1 3 stacks, A2 3, H1 2, R1 2) = **10 stacks x 4 tiers = 40 locations** | `app/dsa/stack.py` `YARD_LAYOUT` |
+| Placement (PLC-3 / PLC-4): 1) keep valid stacks (zone, height, size, weight), 2) prefer a stack whose top container leaves the same day or later, 3) closest leaving date after the new one, 4) tie: fewer containers, 5) none suitable: fewest earlier-leaving blockers | `YardGrid.suggest()` |
+| Appointments handled earliest first: hand-written **Min-Heap** | `app/dsa/min_heap.py`, `GET /api/appointments/upcoming`, `POST /api/appointments/next` |
+| Billing: **3 free days**, currency **PKR**, storage charge = chargeable days x daily tariff (by container size and cargo type) | `app/dsa/billing.py` (`TARIFF` holds placeholder rates: replace with the approved tariff) |
+| Container lookup by number: dictionary (hash map) | `store.containers`, `GET /api/containers/{id}` |
+| Gate trucks: FIFO queue | `app/dsa/gate_queue.py` |
+| **Removed** (out of scope): Trie / prefix search, A* path finding, crane task scheduling (max-heap), vessel ETA sorting | |
+
+Assumptions to confirm: the size rule is "same container length in one stack" (20 / 40 / 45 ft; 40 ft HC counts as 40), the weight rule is
+"a heavier container is never put on a lighter one", and "cargo type" is the yard zone (General / Hazardous / Refrigerated).
 
 ## Storage
 No database. State lives in memory (`app/store.py`) and is saved through `app/storage.py` (JSON file) after every
@@ -43,13 +45,12 @@ write request. To plug in a real database see **DATABASE_GUIDE.md**: implement t
 |---|---|---|
 | Auth | `POST /auth/login`, `POST /auth/signup`, `GET /auth/me` | public / any |
 | State | `GET /state?day=0` (everything the signed-in role may see; the frontend polls this) | any |
-| Containers | `GET /containers`, `/containers/search?q=`, `/containers/{id}`; `POST /containers` (gate-in), `/containers/import`, `/containers/place`, `/containers/customs/clear-many`; `DELETE /containers/{id}` | A G Y (write), A G Y D B (read) |
+| Containers | `GET /containers`, `/containers/{id}`; `POST /containers` (gate-in), `/containers/import`, `/containers/place`, `/containers/customs/clear-many`; `DELETE /containers/{id}` | A G Y (write), A G Y D B (read) |
 | Customs/billing | `POST /containers/{id}/customs/clear`, `/pay`, `/release` | A D B |
 | Yard | `GET /yard`, `POST /yard/suggest` | A G Y |
-| Crane tasks | `GET/POST /tasks`, `POST /tasks/{id}/escalate`, `/tasks/{id}/done`, `/tasks/dispatch` | A Y |
+| Appointments | `GET /appointments/upcoming`, `POST /appointments/next` (earliest first) | A G |
 | Vessels | `GET/POST /vessels`, `DELETE /vessels/{id}` | A G Y |
 | Gate | `GET /gate/slots?day=`, `POST /gate/slots/{day}/{time}/book`, `POST /gate/check-in`, `GET /gate/queue`, `POST /gate/queue/next` | A G |
-| Router | `POST /route/astar` | A Y |
 | Reports | `GET /dashboard`, `/reports/placement`, `/reports/revenue` | A G Y D B / A B |
 | Client portal | `GET/POST /me/shipments`, `DELETE /me/shipments/{id}`, `POST /me/shipments/{id}/pay`, `GET/POST /me/bookings`, `DELETE /me/bookings/{id}` | C A |
 | Admin | `GET /users` | A |

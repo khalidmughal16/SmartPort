@@ -1,9 +1,9 @@
 """In-memory terminal state built from DSA structures. The database is NOT part of this file.
 
   users        dict (hash map)  id -> user              + email index for O(1) login
-  containers   dict (hash map)  number -> record        + Trie for prefix search
-  yard         YardGrid         blocks x bays x tiers   stacks of (container, leave time)
-  pq           PriorityQueue    max-heap of crane tasks
+  containers   dict (hash map)  number -> record        (lookup by container number is O(1))
+  yard         YardGrid         4 blocks, 10 stacks, 4 tiers = 40 locations; stacks of (container, leave time, length, weight)
+  appt_heap    MinHeap          upcoming appointments, earliest first
   gate_queue   GateQueue        FIFO of waiting trucks
   slots        7 days x 8 times -> trucks booked
   vessels, log, watch (client shipments), bookings
@@ -17,11 +17,10 @@ import os
 import time
 from typing import Any, Optional
 
-from .dsa.billing import dues, dwell_days, settled
+from .dsa.billing import CURRENCY, FREE_DAYS, chargeable_days, dues, dwell_days, rate_for, settled
 from .dsa.gate_queue import GateQueue
-from .dsa.priority_queue import PriorityQueue
+from .dsa.min_heap import MinHeap
 from .dsa.stack import YardGrid
-from .dsa.trie import Trie
 from .security import hash_password
 from .storage import JsonFileStorage, Storage
 
@@ -51,17 +50,15 @@ class Store:
         self.users: dict[int, dict] = {}
         self.email_idx: dict[str, int] = {}
         self.containers: dict[str, dict] = {}
-        self.trie = Trie()
         self.yard = YardGrid()
-        self.tasks: dict[int, dict] = {}
-        self.pq = PriorityQueue()
+        self.appt_heap = MinHeap()
         self.gate_queue = GateQueue()
         self.slots: list[dict[str, int]] = [{t: 0 for t in SLOT_TIMES} for _ in range(7)]
         self.vessels: list[dict] = []
         self.log: list[dict] = []
         self.watch: dict[int, list[str]] = {}
         self.bookings: list[dict] = []
-        self.next_ids = {"user": 1, "task": 1, "queue": 1, "booking": 1, "vessel": 1}
+        self.next_ids = {"user": 1, "queue": 1, "booking": 1, "vessel": 1}
 
     def new_id(self, kind: str) -> int:
         n = self.next_ids[kind]
@@ -90,18 +87,15 @@ class Store:
     # ------------------------------------------------------------- containers
     def add_container(self, cid: str, **kw: Any) -> dict:
         c: dict[str, Any] = {"id": cid, "size": "40 ft", "zone": "General", "cus": "Hold", "paid": False, "st": "Pending", "slot": "Not placed",
-                             "block": None, "bay": None, "tier": None, "at": now_ms(), "leave": None, "rel": None, "consignee": None, "bk": False}
-        c.update({k: v for k, v in kw.items() if v is not None or k in ("leave", "consignee")})
+                             "block": None, "bay": None, "tier": None, "at": now_ms(), "leave": None, "rel": None, "consignee": None, "weight": None, "bk": False}
+        c.update({k: v for k, v in kw.items() if v is not None or k in ("leave", "consignee", "weight")})
         self.containers[cid] = c
-        self.trie.insert(cid)
         return c
 
     def drop_container(self, cid: str) -> None:
         self.containers.pop(cid, None)
         self.yard.remove(cid)
         self.retier()
-        # the trie has no delete: rebuild it (O(total letters), fine at terminal scale)
-        self.trie = Trie(list(self.containers))
         for ids in self.watch.values():
             if cid in ids:
                 ids.remove(cid)
@@ -109,36 +103,52 @@ class Store:
     def retier(self) -> None:
         """After a removal, containers above it dropped one tier: refresh block / bay / tier / slot on every record."""
         for (block, bay), s in self.yard.stacks.items():
-            for tier, (cid, _) in enumerate(s):
-                c = self.containers.get(cid)
+            for tier, it in enumerate(s):
+                c = self.containers.get(it.cid)
                 if c:
                     c.update(block=block, bay=bay, tier=tier, slot=f"{block}-B{bay + 1}-T{tier + 1}")
 
     def view(self, c: dict) -> dict:
-        """Container as sent to the frontend, plus the computed billing fields."""
+        """Container as sent to the frontend, plus the computed billing fields (PKR)."""
         d = dwell_days(c["at"], c["rel"], now_ms())
-        return {**c, "dwell": d, "dues": dues(d), "settled": settled(d, c["paid"])}
+        amount = dues(d, c["size"], c["zone"])
+        return {**c, "dwell": d, "free_days": FREE_DAYS, "chargeable_days": chargeable_days(d), "rate": rate_for(c["size"], c["zone"]),
+                "currency": CURRENCY, "dues": amount, "settled": settled(amount, c["paid"])}
 
     def days_in(self, c: dict) -> int:
         return dwell_days(c["at"], c["rel"], now_ms())
 
-    # ------------------------------------------------------------------ tasks
-    def add_task(self, text: str, p: int) -> dict:
-        t = {"id": self.new_id("task"), "text": text, "p": p}
-        self.tasks[t["id"]] = t
-        self.pq.push(t["id"], p, text)
-        return t
+    def due_of(self, c: dict) -> int:
+        """Storage charge in PKR for this container right now."""
+        return dues(self.days_in(c), c["size"], c["zone"])
 
-    def task_view(self, t: dict) -> dict:
-        return {"id": str(t["id"]), "text": t["text"], "p": t["p"]}
+    # ----------------------------------------------------------- appointments
+    @staticmethod
+    def appt_key(b: dict) -> tuple[str, str]:
+        """Sort key: (date, start time). "2026-12-01", "08:00-09:00" -> ("2026-12-01", "08:00")."""
+        return (b["date"], b["time_range"].split("-")[0].strip())
+
+    def add_booking(self, b: dict) -> None:
+        self.bookings.append(b)
+        self.appt_heap.push(b["id"], self.appt_key(b), b["id"])
+
+    def cancel_booking(self, bid: int) -> None:
+        self.bookings[:] = [b for b in self.bookings if b["id"] != bid]
+        if bid in self.appt_heap:
+            self.appt_heap.remove(bid)
+
+    def upcoming_appointments(self) -> list[dict]:
+        """Appointments in time order, earliest first (read from the min-heap)."""
+        by_id = {b["id"]: b for b in self.bookings}
+        return [by_id[k] for k, _, _ in self.appt_heap.ordered() if k in by_id]
 
     # --------------------------------------------------------------- vessels
     def vessel_list(self) -> list[dict]:
-        return sorted(self.vessels, key=lambda v: v["eta"])
+        return list(self.vessels)  # kept in the order they were added (no ETA sorting)
 
     # ------------------------------------------------------------------- seed
     def seed(self) -> None:
-        """First run: only the demo accounts. Terminal data (containers, vessels, tasks) starts empty, like the frontend."""
+        """First run: only the demo accounts. Terminal data (containers, vessels) starts empty, like the frontend."""
         self.reset()
         for name, email, pw, role in DEMO_USERS:
             self.add_user(name, email, pw, role)
@@ -147,7 +157,7 @@ class Store:
     def to_json(self) -> dict:
         return {
             "users": list(self.users.values()), "containers": list(self.containers.values()), "yard": self.yard.to_dict(),
-            "tasks": list(self.tasks.values()), "gate_queue": self.gate_queue.to_list(), "slots": self.slots, "vessels": self.vessels,
+            "gate_queue": self.gate_queue.to_list(), "slots": self.slots, "vessels": self.vessels,
             "log": self.log, "watch": self.watch, "bookings": self.bookings, "next_ids": self.next_ids,
         }
 
@@ -158,18 +168,20 @@ class Store:
             self.email_idx[u["email"]] = u["id"]
         for c in d["containers"]:
             self.containers[c["id"]] = c
-            self.trie.insert(c["id"])
         self.yard = YardGrid.from_dict(d["yard"])
-        for t in d["tasks"]:
-            self.tasks[t["id"]] = t
-            self.pq.push(t["id"], t["p"], t["text"])
+        for c in self.containers.values():  # a snapshot from an older yard layout: anything that no longer fits goes back to Pending
+            if c["st"] == "In yard" and c["id"] not in self.yard.where:
+                c.update(st="Pending", block=None, bay=None, tier=None, slot="Not placed")
         self.gate_queue = GateQueue(d.get("gate_queue", []))
         self.slots = d["slots"]
         self.vessels = d.get("vessels", [])
         self.log = d.get("log", [])
         self.watch = {int(k): v for k, v in d["watch"].items()}
         self.bookings = d["bookings"]
-        self.next_ids = {**self.next_ids, **d["next_ids"]}
+        for b in self.bookings:
+            self.appt_heap.push(b["id"], self.appt_key(b), b["id"])
+        self.next_ids = {**self.next_ids, **{k: v for k, v in d["next_ids"].items() if k in self.next_ids}}
+        self.retier()
 
     def load_or_seed(self) -> None:
         data = self.storage.load() if self.storage else None

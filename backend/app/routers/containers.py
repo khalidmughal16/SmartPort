@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..deps import require
 from ..dsa.billing import can_release
@@ -22,18 +22,12 @@ def _register(body: ContainerIn) -> dict:
         raise HTTPException(409, f"{cid} is already in the terminal.")
     if old:  # a released number coming back: start a fresh record
         store.drop_container(cid)
-    return store.add_container(cid, size=body.size, zone=body.zone, consignee=(body.consignee or "").strip() or None, leave=body.leave)
+    return store.add_container(cid, size=body.size, zone=body.zone, consignee=(body.consignee or "").strip() or None, leave=body.leave, weight=body.weight)
 
 
 @router.get("", dependencies=[Depends(require(*STAFF))])
 async def list_containers(status: str | None = None):
     return [store.view(c) for _, c in sorted(store.containers.items()) if status in (None, c["st"])]
-
-
-@router.get("/search", dependencies=[Depends(require(*STAFF))])
-async def search(q: str = Query(min_length=1)):
-    """Prefix search with the Trie."""
-    return {"query": q.upper(), "matches": store.trie.with_prefix(q, limit=10)}
 
 
 @router.post("", status_code=201, dependencies=[Depends(require(*INTAKE))])
@@ -60,7 +54,7 @@ async def import_manifest(body: ImportIn):
 
 @router.post("/place", dependencies=[Depends(require(*INTAKE))])
 async def place(body: ContainerIn):
-    """The server runs the optimizer (YardGrid.suggest) and pushes the container onto the best stack.
+    """The server applies the approved placement rules (YardGrid.suggest) and pushes the container onto the best stack.
     Creates the container first when it was not registered yet (the one-step Gate-In flow)."""
     cid = _norm(body.id)
     c = store.containers.get(cid)
@@ -69,14 +63,16 @@ async def place(body: ContainerIn):
     if c and c["st"] == "Released":
         c = None
     zone = c["zone"] if c else body.zone
+    size = c["size"] if c else body.size
     leave = c["leave"] if c and c["leave"] else body.leave
-    s = store.yard.suggest(zone, leave)
+    weight = c["weight"] if c and c["weight"] else body.weight
+    s = store.yard.suggest(zone, leave, size, weight)
     if s is None:
-        raise HTTPException(409, f"The {zone} zone is full. Free a slot first.")
+        raise HTTPException(409, f"No valid stack is free in the {zone} zone for a {size} container. Free a slot first.")
     created = c is None
     if created:
         c = _register(body)
-    store.yard.place(s.block, s.bay, cid, leave)
+    store.yard.place(s.block, s.bay, cid, leave, size, weight)
     c.update(st="In yard", block=s.block, bay=s.bay, tier=s.tier, slot=s.slot)
     store.log_event("Placed", f"{cid} {'checked in and ' if created else ''}placed at {s.slot}", cid)
     return {"placement": s.as_dict(), "container": store.view(c)}
@@ -129,7 +125,7 @@ async def release(cid: str):
     c = get_container(cid)
     if c["st"] != "In yard":
         raise HTTPException(409, "Only containers placed in the yard can be released.")
-    if not can_release(c["cus"], store.days_in(c), c["paid"]):
+    if not can_release(c["cus"], store.due_of(c), c["paid"]):
         raise HTTPException(409, "Release blocked: clear customs and pay dues first.")
     store.yard.remove(c["id"])
     c["st"], c["rel"] = "Released", now_ms()

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { P, R, homeOf } from '../lib/data'
+import { FREE_DAYS, P, R, homeOf } from '../lib/data'
 import { dwell } from '../lib/logic'
 import { actions, useStore } from '../lib/store'
 import { views } from '../views'
@@ -19,7 +19,6 @@ const NAV: Record<string, string> = {
   'gate-in': 'M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14',
   appointments: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
   placement: 'M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
-  'crane-tasks': 'M4 21V8l8-5 8 5M12 3v8M12 11l6 3M18 14v5',
   'customs-billing': 'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4',
   reports: 'M3 3v18h18M7 15l4-4 3 3 5-6',
   users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
@@ -59,9 +58,9 @@ export function AppPage() {
   const View = views[p.id]
   const live = C.filter((c) => c.st !== 'Released')
   const alertList: { k: string; label: string; text: string }[] = []
-  const hold = live.filter((c) => c.cus === 'Hold').length, late = live.filter((c) => dwell(c) > 5).length, wait = C.filter((c) => c.st === 'Pending').length
+  const hold = live.filter((c) => c.cus === 'Hold').length, late = live.filter((c) => dwell(c) > FREE_DAYS).length, wait = C.filter((c) => c.st === 'Pending').length
   if (hold) alertList.push({ k: 'w', label: 'Customs hold', text: hold + ' container' + (hold > 1 ? 's' : '') + ' awaiting clearance' })
-  if (late) alertList.push({ k: 'x', label: 'Overdue', text: late + ' container' + (late > 1 ? 's' : '') + ' past 5 free days' })
+  if (late) alertList.push({ k: 'x', label: 'Overdue', text: late + ' container' + (late > 1 ? 's' : '') + ' past ' + FREE_DAYS + ' free days' })
   if (wait) alertList.push({ k: 'ok', label: 'Placement', text: wait + ' container' + (wait > 1 ? 's' : '') + ' waiting for a slot' })
   const initial = (user?.n || R[role]).trim().charAt(0).toUpperCase()
   const today = new Date().toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })

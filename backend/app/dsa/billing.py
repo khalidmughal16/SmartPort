@@ -1,18 +1,45 @@
-"""Storage billing rules: 5 free days, then $45 per day."""
-FREE_DAYS = 5
-RATE_PER_DAY = 45
+"""Storage billing rules.
+
+* 3 free days (assumed project setting), then every chargeable day is billed.
+* The daily rate depends on the container size and the cargo type (the yard zone). Currency: PKR.
+* Storage charge = chargeable days x applicable daily tariff.
+
+TARIFF below holds PLACEHOLDER rates (PKR per day): replace the numbers with the approved tariff.
+"""
+FREE_DAYS = 3
+CURRENCY = "PKR"
+
+#            General  Hazardous  Refrigerated   (PKR per chargeable day)
+TARIFF: dict[str, dict[str, int]] = {
+    "20 ft":    {"General": 1500, "Hazardous": 2500, "Refrigerated": 3000},
+    "40 ft":    {"General": 2500, "Hazardous": 4000, "Refrigerated": 5000},
+    "40 ft HC": {"General": 2750, "Hazardous": 4400, "Refrigerated": 5500},
+    "45 ft":    {"General": 3000, "Hazardous": 4800, "Refrigerated": 6000},
+}
+DEFAULT_SIZE = "40 ft"
 
 
-def dues(days_in_yard: int) -> int:
-    return max(0, days_in_yard - FREE_DAYS) * RATE_PER_DAY
+def rate_for(size: str, zone: str) -> int:
+    """Daily tariff for this size and cargo type (unknown values fall back to a 40 ft / General rate)."""
+    row = TARIFF.get(size) or TARIFF[DEFAULT_SIZE]
+    return row.get(zone, row["General"])
 
 
-def settled(days_in_yard: int, paid: bool) -> bool:
-    return dues(days_in_yard) == 0 or paid
+def chargeable_days(days_in_yard: int) -> int:
+    return max(0, days_in_yard - FREE_DAYS)
 
 
-def can_release(customs: str, days_in_yard: int, paid: bool) -> bool:
-    return customs == "Cleared" and settled(days_in_yard, paid)
+def dues(days_in_yard: int, size: str = DEFAULT_SIZE, zone: str = "General") -> int:
+    """Storage charge in PKR = chargeable days x daily tariff."""
+    return chargeable_days(days_in_yard) * rate_for(size, zone)
+
+
+def settled(dues_amount: int, paid: bool) -> bool:
+    return dues_amount == 0 or paid
+
+
+def can_release(customs: str, dues_amount: int, paid: bool) -> bool:
+    return customs == "Cleared" and settled(dues_amount, paid)
 
 
 DAY_MS = 86_400_000

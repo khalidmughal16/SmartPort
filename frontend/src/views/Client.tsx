@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Container } from '../lib/data'
+import { Container, pkr } from '../lib/data'
 import { due, dwell, settled } from '../lib/logic'
 import { actions, currentUser, useStore } from '../lib/store'
 import { Kp, Pill, Table } from '../components/ui'
@@ -19,7 +19,7 @@ export function Overview() {
   return (
     <>
       <p className="sub">Welcome{u.n ? ', ' + u.n.split(' ')[0] : ''}{u.co ? ` (${u.co})` : ''}. Here is where your containers stand today.</p>
-      <Kp items={[[L.length, 'Containers tracked'], [L.filter((c) => c.cus !== 'Cleared').length, 'Customs holds'], ['$' + owed(L), 'Outstanding dues'], [B.length, 'Gate bookings']]} />
+      <Kp items={[[L.length, 'Containers tracked'], [L.filter((c) => c.cus !== 'Cleared').length, 'Customs holds'], [pkr(owed(L)), 'Outstanding dues'], [B.length, 'Gate bookings']]} />
       <div className="tile cl-c">
         <b>Quick actions</b>
         <div className="cl-r">
@@ -28,7 +28,7 @@ export function Overview() {
           <Link className="btn" href="/app/my-billing">Pay dues</Link>
         </div>
       </div>
-      {L.length > 0 && <Table head={['Container', 'Customs', 'Dues', 'Days in yard']} rows={L.map((c) => [c.id, c.cus, settled(c) ? '$0' : '$' + due(c), dwell(c)])} />}
+      {L.length > 0 && <Table head={['Container', 'Customs', 'Dues', 'Days in yard']} rows={L.map((c) => [c.id, c.cus, settled(c) ? pkr(0) : pkr(due(c)), dwell(c)])} />}
     </>
   )
 }
@@ -54,7 +54,7 @@ export function Shipments() {
               <b>{c.id}</b>
               <span>
                 <Pill k={c.cus === 'Cleared' ? 'ok' : 'w'}>{c.cus === 'Cleared' ? 'Customs cleared' : 'Customs hold'}</Pill>{' '}
-                {settled(c) ? <Pill k="ok">No dues</Pill> : <Pill k="x">{'Dues $' + due(c)}</Pill>}
+                {settled(c) ? <Pill k="ok">No dues</Pill> : <Pill k="x">{'Dues ' + pkr(due(c))}</Pill>}
               </span>
             </div>
             <div className="stp" role="img" aria-label={'Progress: ' + stages[dn - 1]}>{stages.map((s, i) => <span key={s} className={i < dn ? 'on' : ''} />)}</div>
@@ -104,10 +104,10 @@ export function MyBilling() {
   const { L } = useWatchlist()
   return (
     <>
-      <Kp items={[['$' + owed(L), 'Outstanding dues'], [L.length, 'Containers tracked'], [L.filter((c) => c.cus === 'Cleared' && settled(c)).length, 'Ready for pickup']]} />
+      <Kp items={[[pkr(owed(L)), 'Outstanding dues'], [L.length, 'Containers tracked'], [L.filter((c) => c.cus === 'Cleared' && settled(c)).length, 'Ready for pickup']]} />
       <Table head={['Container', 'Days in yard', 'Customs', 'Dues', 'Action']} rows={L.map((c) => [
-        c.id, dwell(c), c.cus, settled(c) ? '$0' : '$' + due(c),
-        settled(c) ? <Pill k="ok">Settled</Pill> : <button className="btn p" onClick={() => actions.payClient(c.id)}>Pay ${due(c)}</button>,
+        c.id, dwell(c), c.cus, settled(c) ? pkr(0) : pkr(due(c)),
+        settled(c) ? <Pill k="ok">Settled</Pill> : <button className="btn p" onClick={() => actions.payClient(c.id)}>Pay {pkr(due(c))}</button>,
       ])} />
     </>
   )
