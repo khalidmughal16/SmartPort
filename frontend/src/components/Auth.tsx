@@ -13,8 +13,12 @@ export function Auth({ signup }: { signup: boolean }) {
   const [show, setShow] = useState(false)
   const [err, setErr] = useState('')
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
-  const submit = () => {
-    const res = signup ? actions.signUp(f) : actions.signIn(f.e, f.p)
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    if (busy) return
+    setBusy(true); setErr('')
+    const res = await (signup ? actions.signUp(f) : actions.signIn(f.e, f.p))
+    setBusy(false)
     if (res.error) setErr(res.error)
     else router.push('/app/' + res.to)
   }
@@ -53,7 +57,7 @@ export function Auth({ signup }: { signup: boolean }) {
               </>
             )}
             <p id="er" className="er" role="alert">{err}</p>
-            <button type="button" className="btn p" style={{ width: '100%', justifyContent: 'center' }} onClick={submit}>{signup ? 'Create account' : 'Sign in'}</button>
+            <button type="button" className="btn p" style={{ width: '100%', justifyContent: 'center' }} onClick={submit} disabled={busy}>{busy ? 'Please wait...' : signup ? 'Create account' : 'Sign in'}</button>
           </form>
           <p className="sub" style={{ marginTop: 14 }}>
             {signup ? <>Already have an account? <Link className="ul" href="/app/login">Sign in</Link></> : (

@@ -92,6 +92,33 @@ class TestTrieQueueBilling(unittest.TestCase):
         r = compare(32, seed=7)
         self.assertLessEqual(r["smart_extra_moves"], r["random_extra_moves"])
 
+class TestYardGrid(unittest.TestCase):
+    def test_suggest_prefers_no_blockers_then_short_stack(self):
+        from app.dsa.stack import YardGrid
+        g = YardGrid()
+        g.place("A1", 0, "EARLY", 1)
+        s = g.suggest("General", 9)           # EARLY leaves before 9, so bay 0 would create a blocker
+        self.assertEqual((s.block, s.bay, s.extra), ("A1", 1, 0))
+        self.assertEqual(g.suggest("General", 0).extra, 0)
+
+    def test_zone_and_height_limits(self):
+        from app.dsa.stack import YardGrid
+        g = YardGrid()
+        self.assertEqual(g.suggest("Hazardous").block, "H1")
+        for i in range(g.bays * g.max_tier):
+            s = g.suggest("Refrigerated")
+            g.place(s.block, s.bay, f"R{i}")
+        self.assertIsNone(g.suggest("Refrigerated"))
+
+    def test_remove_and_roundtrip(self):
+        from app.dsa.stack import YardGrid
+        g = YardGrid()
+        for cid in ("a", "b", "c"):
+            g.place("A1", 0, cid, None)
+        self.assertEqual(g.remove("b"), ("A1", 0))
+        self.assertEqual(g.ids("A1", 0), ["a", "c"])
+        self.assertEqual(YardGrid.from_dict(g.to_dict()).ids("A1", 0), ["a", "c"])
+
 
 if __name__ == "__main__":
     unittest.main()

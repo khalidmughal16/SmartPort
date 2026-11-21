@@ -34,7 +34,7 @@ const HOME = 'M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6'
 /** Guards a page by sign-in and role, then renders the sidebar + view. */
 export function AppPage() {
   const page = useParams<{ page?: string }>()?.page ?? ''
-  const { role, user, C } = useStore()
+  const { role, user, C, online } = useStore()
   const router = useRouter()
   const p = P.find((x) => x.id === page)
   const [alerts, setAlerts] = useState(false)
@@ -82,6 +82,7 @@ export function AppPage() {
         <Link href="/app/"><Icon d={HOME} cls="ni" />Home</Link>
       </aside>
       <main id="main">
+        {!online && <p className="offline" role="alert">Cannot reach the SmartPort server. Start the backend (<code>uvicorn app.main:app --reload</code> in the backend folder). Retrying automatically.</p>}
         <div className="tb">
           <button className="sbox" onClick={() => setPalette(true)} aria-label="Search pages"><span>Search containers, pages...</span><kbd>Ctrl+K</kbd></button>
           <span className="tbr">

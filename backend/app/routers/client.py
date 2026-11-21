@@ -9,6 +9,11 @@ router = APIRouter(prefix="/api/me", tags=["client portal"])
 client = require("C", "A")
 
 
+def booking_view(b: dict) -> dict:
+    """Booking in the shape the frontend uses: id = container, t = purpose, d = date, s = time range."""
+    return {"bid": b["id"], "id": b["container_id"], "t": b["purpose"], "d": b["date"], "s": b["time_range"]}
+
+
 def _owns(u: dict, cid: str) -> bool:
     return cid in store.watch.get(u["id"], [])
 
@@ -35,7 +40,7 @@ async def remove_shipment(cid: str, u: dict = Depends(client)):
 
 @router.get("/bookings")
 async def bookings(u: dict = Depends(client)):
-    return sorted((b for b in store.bookings if b["user_id"] == u["id"]), key=lambda b: b["date"])
+    return [booking_view(b) for b in sorted((b for b in store.bookings if b["user_id"] == u["id"]), key=lambda b: b["date"])]
 
 
 @router.post("/bookings", status_code=201)
@@ -43,13 +48,13 @@ async def book(body: BookingIn, u: dict = Depends(client)):
     c = get_container(body.container_id)
     if not _owns(u, c["id"]):
         raise HTTPException(403, "Add the container to your shipments first.")
-    if body.purpose == "Pickup" and not can_release(c["cus"], c["d"], c["paid"]):
+    if body.purpose == "Pickup" and not can_release(c["cus"], store.days_in(c), c["paid"]):
         raise HTTPException(409, "Pickup needs customs cleared and dues paid.")
-    b = {"id": store.new_id("booking"), "user_id": u["id"], "container_id": c["id"], **body.model_dump(exclude={"container_id"})}
+    b = {"id": store.new_id("booking"), "user_id": u["id"], "container_id": c["id"], "purpose": body.purpose, "date": body.date, "time_range": body.time_range}
     store.bookings.append(b)
     if body.purpose == "Pickup":
         c["bk"] = True
-    return b
+    return booking_view(b)
 
 
 @router.delete("/bookings/{booking_id}", status_code=204)
@@ -62,7 +67,8 @@ async def pay(cid: str, u: dict = Depends(client)):
     c = get_container(cid)
     if not _owns(u, c["id"]):
         raise HTTPException(403, "That container is not in your shipments.")
-    if settled(c["d"], c["paid"]):
+    if settled(store.days_in(c), c["paid"]):
         raise HTTPException(409, "Nothing to pay.")
     c["paid"] = True
+    store.log_event("Payment", f"Payment received for {c['id']}", c["id"])
     return store.view(c)

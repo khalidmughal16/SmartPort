@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { ZONES, Zone } from '../lib/data'
-import { Suggestion, suggest } from '../lib/logic'
+import { Suggestion } from '../lib/logic'
 import { NewContainer, actions, useStore } from '../lib/store'
 import { Table } from '../components/ui'
 
@@ -15,13 +15,12 @@ function Result({ s, f, onDone }: { s: Suggestion | null | undefined; f: NewCont
   return (
     <>
       <p><b>Block {s.block}, bay {s.bay + 1}, tier {s.tier + 1}</b> in the {s.zone} zone. Extra moves: {s.e}. Reason: the stack with the fewest containers that leave earlier than this one.</p>
-      <button className="btn p" onClick={() => { if (actions.placeContainer(f, s)) onDone?.() }}>Confirm placement</button>
+      <button className="btn p" onClick={async () => { if (await actions.placeContainer(f, s)) onDone?.() }}>Confirm placement</button>
     </>
   )
 }
 
 export function GateIn() {
-  const { C } = useStore()
   const [cn, setCn] = useState('')
   const [size, setSize] = useState(SIZES[2])
   const [zone, setZone] = useState<Zone>('General')
@@ -43,7 +42,7 @@ export function GateIn() {
         <input id="gc" value={co} onChange={(e) => setCo(e.target.value)} />
         <label htmlFor="gl">Planned pick-up date (optional)</label>
         <input id="gl" type="date" value={lv} onChange={(e) => { setLv(e.target.value); setSugg(undefined) }} />
-        <p><button className="btn p" onClick={() => setSugg(suggest(C, f.leave, zone))}>Suggest slot</button></p>
+        <p><button className="btn p" onClick={async () => setSugg(await actions.suggestSlot(zone, f.leave))}>Suggest slot</button></p>
       </div>
       <div className="tile" id="res">
         {sugg === undefined ? 'Suggestions appear here with the block, bay, tier and reason.' : <Result s={sugg} f={f} onDone={reset} />}
@@ -60,7 +59,7 @@ export function Placement() {
   return (
     <div className="two">
       <div>
-        <Table head={['Pending', 'Zone', 'Action']} rows={pend.map((c) => [c.id, c.zone, <button className="btn" onClick={() => setPick({ id: c.id, s: suggest(C, c.leave, c.zone) })}>Suggest</button>])} />
+        <Table head={['Pending', 'Zone', 'Action']} rows={pend.map((c) => [c.id, c.zone, <button className="btn" onClick={async () => setPick({ id: c.id, s: await actions.suggestSlot(c.zone, c.leave) })}>Suggest</button>])} />
       </div>
       <div className="tile" id="res">
         {pick && cur ? <Result s={pick.s} f={{ id: cur.id, size: cur.size, zone: cur.zone, leave: cur.leave }} onDone={() => setPick(null)} /> : pend.length ? 'Pick a container to see its best slot.' : 'No containers are waiting. Add one from Containers or Gate-In.'}

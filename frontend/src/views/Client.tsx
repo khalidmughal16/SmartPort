@@ -88,7 +88,7 @@ export function BookSlot() {
           <div className="f"><label htmlFor="ks">Time</label><select id="ks" value={f.s} onChange={(e) => setF({ ...f, s: e.target.value })}>{times.map((x) => <option key={x}>{x}</option>)}</select></div>
         </div>
         <p id="er" className="er" role="alert">{err}</p>
-        <button className="btn p" onClick={() => setErr(actions.bookClientSlot({ id, t: f.t, d: f.d, s: f.s }) || '')}>Book slot</button>
+        <button className="btn p" onClick={async () => setErr((await actions.bookClientSlot({ id, t: f.t, d: f.d, s: f.s })) || '')}>Book slot</button>
       </div>
       <div className="tile cl-c">
         <b>My bookings</b>

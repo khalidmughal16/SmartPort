@@ -6,14 +6,21 @@ from ..store import store
 
 router = APIRouter(prefix="/api/gate", tags=["gate"], dependencies=[Depends(require("A", "G"))])
 CAPACITY = 3  # trucks per slot
+DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def slot_rows(day: int) -> list[list]:
+    """[[time, booked], ...] in the shape the frontend uses."""
+    return [[t, n] for t, n in store.slots[day].items()]
 
 
 @router.post("/check-in", status_code=201)
 async def check_in(body: CheckInIn):
-    """Truck arrives: register the container as Pending and enqueue the truck (FIFO)."""
+    """Truck arrives: register the container as Pending (if new) and enqueue the truck (FIFO)."""
     cid = body.container_id.strip().upper()
     if cid not in store.containers:
-        store.add_container(cid, st="Pending", zone="Hazard" if body.hazard else "Standard")
+        store.add_container(cid, size=body.size, zone=body.zone)
+        store.log_event("Gate-in", f"{cid} checked in ({body.size}, {body.zone})", cid)
     store.gate_queue.enqueue({"id": store.new_id("queue"), "truck": body.truck, "container_id": cid})
     return {"container_id": cid, "queue_position": len(store.gate_queue)}
 
@@ -37,7 +44,7 @@ async def serve_next():
 async def slots(day: int = 0):
     if not 0 <= day <= 6:
         raise HTTPException(404, "Day must be 0 (Mon) to 6 (Sun).")
-    return [{"time": t, "booked": n, "capacity": CAPACITY, "full": n >= CAPACITY} for t, n in store.slots[day].items()]
+    return {"day": day, "capacity": CAPACITY, "slots": slot_rows(day)}
 
 
 @router.post("/slots/{day}/{time}/book")
@@ -47,4 +54,5 @@ async def book(day: int, time: str):
     if store.slots[day][time] >= CAPACITY:
         raise HTTPException(409, "Slot full: three trucks per slot.")
     store.slots[day][time] += 1
-    return {"time": time, "booked": store.slots[day][time], "capacity": CAPACITY}
+    store.log_event("Gate", f"Gate slot {time} booked ({DAYS[day]})")
+    return {"day": day, "time": time, "booked": store.slots[day][time], "capacity": CAPACITY}

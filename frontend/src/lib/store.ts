@@ -1,54 +1,40 @@
 import { useSyncExternalStore } from 'react'
-import {
-  Booking, Container, DEMO_USERS, LogEntry, P, Role, Task, User, Vessel, Zone, homeOf, initialSlots,
-} from './data'
-import { due, settled, Suggestion } from './logic'
+import { Booking, Container, LogEntry, P, Role, Task, User, Vessel, Zone, homeOf, initialSlots } from './data'
+import { ApiError, api, getToken, setToken } from './api'
+import { Suggestion, settled } from './logic'
 
 export type Drawer = { kind: 'detail'; i: number } | { kind: 'ticket'; i: number } | { kind: 'add' } | null
 
-/** Everything the terminal stores. Starts empty and is saved in this browser (localStorage). */
+/** Everything the terminal shows. The SERVER is the source of truth: this is a cache of GET /api/state. */
 export interface TerminalData {
   C: Container[]; tasks: Task[]; vessels: Vessel[]; log: LogEntry[]
-  slots: [string, number][]; days: [string, number][][] | null; AD: number
+  slots: [string, number][]; AD: number
 }
 export interface State extends TerminalData {
   role: Role | null; user: User | null; next: string | null; users: User[]
+  online: boolean
   toast: { msg: string; bad: boolean; k: number } | null
   drawer: Drawer
 }
 
 const browser = typeof window !== 'undefined'
-const read = <T,>(store: 'sessionStorage' | 'localStorage', key: string, fallback: T): T => {
+const read = <T,>(key: string, fallback: T): T => {
   if (!browser) return fallback
-  try { return JSON.parse(window[store].getItem(key) || 'null') ?? fallback } catch { return fallback }
+  try { return JSON.parse(window.sessionStorage.getItem(key) || 'null') ?? fallback } catch { return fallback }
 }
-const session = read<{ role?: Role; user?: User } | null>('sessionStorage', 'sp', null)
-const saved = read<User[]>('localStorage', 'sp_users', [])
-const users = [...DEMO_USERS]
-saved.forEach((u) => { if (!users.some((x) => x.e === u.e)) users.push(u) })
+const session = read<{ role?: Role; user?: User } | null>('sp', null)
 
-const emptyData = (): TerminalData => ({ C: [], tasks: [], vessels: [], log: [], slots: initialSlots(), days: null, AD: 0 })
-const arr = <T,>(v: unknown, f: T[]): T[] => (Array.isArray(v) ? (v as T[]) : f)
-const loadData = (): TerminalData => {
-  const d = emptyData(), s = read<Partial<TerminalData> | null>('localStorage', 'sp_data', null)
-  if (!s) return d
-  return { C: arr(s.C, d.C), tasks: arr(s.tasks, d.tasks), vessels: arr(s.vessels, d.vessels), log: arr(s.log, d.log), slots: arr(s.slots, d.slots), days: s.days ?? null, AD: s.AD ?? 0 }
-}
+const emptyData = (): TerminalData => ({ C: [], tasks: [], vessels: [], log: [], slots: initialSlots(), AD: 0 })
 
 let state: State = {
-  role: session?.role ?? null, user: session?.user ?? null, next: null, users,
-  ...loadData(), toast: null, drawer: null,
+  role: getToken() ? session?.role ?? null : null, user: getToken() ? session?.user ?? null : null, next: null, users: [],
+  ...emptyData(), online: true, toast: null, drawer: null,
 }
 const subs = new Set<() => void>()
 const persist = () => {
   try { sessionStorage.setItem('sp', JSON.stringify({ role: state.role, user: state.user })) } catch { /* ignore */ }
-  const { C, tasks, vessels, log, slots, days, AD } = state
-  try { localStorage.setItem('sp_data', JSON.stringify({ C, tasks, vessels, log, slots, days, AD })) } catch { /* ignore */ }
 }
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; persist(); subs.forEach((f) => f()) }
-const saveUsers = (list: User[]) => {
-  try { localStorage.setItem('sp_users', JSON.stringify(list.filter((u) => u.sg))) } catch { /* ignore */ }
-}
 const serverState: State = { ...state, role: null, user: null }
 export const useStore = () => useSyncExternalStore((f) => { subs.add(f); return () => { subs.delete(f) } }, () => state, () => serverState)
 export const getState = () => state
@@ -60,204 +46,225 @@ export const toast = (msg: string, bad = false) => {
   toastTimer = window.setTimeout(() => set({ toast: null }), 2600)
 }
 
-/** Newest first, capped so localStorage stays small. */
-const withLog = (kind: string, m: string, id?: string): LogEntry[] => [{ t: Date.now(), kind, id, m }, ...state.log].slice(0, 100)
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+/* ------------------------------------------------------------------ server mapping */
+interface ApiUser { id: number; name: string; email: string; role: Role; company?: string; watch?: string[] }
+interface ApiBooking { bid: number; id: string; t: string; d: string; s: string }
+interface ApiState {
+  role: Role; containers: Container[]; bookings?: ApiBooking[]; tasks?: Task[]; vessels?: Vessel[]; log?: LogEntry[]
+  slots?: [string, number][]; day?: number; users?: ApiUser[]
+}
+const toUser = (u: ApiUser, slots: Booking[] = []): User => ({ n: u.name, e: u.email, p: '', r: u.role, co: u.company || '', watch: u.watch || [], slots })
+/** The API sends null for "not set"; the views expect the field to be missing. */
+const clean = (c: Container): Container => Object.fromEntries(Object.entries(c).filter(([, v]) => v !== null)) as unknown as Container
+
+let lastSync = ''
+/** Pulls the latest terminal data for the signed-in role. Cheap to call; only re-renders when something changed. */
+export async function refresh(): Promise<void> {
+  if (!getToken() || !state.role) return
+  try {
+    const s = await api<ApiState>('/api/state?day=' + state.AD)
+    if (!getToken()) return
+    const sig = JSON.stringify(s)
+    if (sig === lastSync && state.online) return
+    lastSync = sig
+    const bookings: Booking[] = (s.bookings || []).map((b) => ({ id: b.id, t: b.t, d: b.d, s: b.s, bid: b.bid }))
+    const watch = s.role === 'C' ? s.containers.map((c) => c.id) : undefined
+    set({
+      C: s.containers.map(clean), tasks: s.tasks || [], vessels: s.vessels || [], log: s.log || [],
+      slots: s.slots && s.slots.length ? s.slots : initialSlots(), users: (s.users || []).map((u) => toUser(u)),
+      user: state.user && s.role === 'C' ? { ...state.user, slots: bookings, watch: watch ?? state.user.watch } : state.user, online: true,
+    })
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { actions.signOut(); toast('Your session ended. Please sign in again.', true); return }
+    if (e instanceof ApiError && e.status === 0 && state.online) set({ online: false })
+  }
+}
+
+let timer = 0
+const startSync = () => {
+  if (!browser) return
+  stopSync()
+  void refresh()
+  timer = window.setInterval(() => { if (!document.hidden) void refresh() }, 8000)
+}
+const stopSync = () => { clearInterval(timer); timer = 0 }
+if (browser) {
+  window.addEventListener('focus', () => { if (state.role) void refresh() })
+  if (state.role && getToken()) startSync()
+}
+
+/** Runs one API call, refreshes the cache and shows errors as toasts. Returns the response, or null when it failed. */
+async function call<T>(path: string, opts?: { method?: string; body?: unknown }, ok?: string): Promise<T | null> {
+  try {
+    const r = await api<T>(path, opts)
+    lastSync = ''
+    await refresh()
+    if (ok) toast(ok)
+    return r
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 401) { actions.signOut(); toast('Your session ended. Please sign in again.', true); return null }
+    toast(e instanceof Error ? e.message : 'Something went wrong.', true)
+    return null
+  }
+}
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
-/** The signed-in person, as stored in the user list. */
-export const currentUser = (s = state) => s.users.find((x) => s.user && x.e === s.user.e) || s.users.find((x) => x.r === 'C') as User
-const updateUser = (fn: (u: User) => User) => {
-  const cu = currentUser()
-  const users = state.users.map((u) => (u === cu ? fn(u) : u))
-  saveUsers(users)
-  set({ users })
-}
+/** The signed-in person (clients carry their followed containers and bookings). */
+export const currentUser = (s = state) => (s.user || toUser({ id: 0, name: '', email: '', role: 'C' })) as User
 const nextFor = (r: Role) => {
   const p = P.find((x) => x.id === state.next)
   return p && p.roles.includes(r) ? p.id : homeOf(r)
 }
 const norm = (v: string) => v.trim().toUpperCase()
-const patchC = (i: number, patch: Partial<Container>) => state.C.map((c, k) => (k === i ? { ...c, ...patch } : c))
+const idOf = (i: number) => state.C[i]?.id
 
 export interface NewContainer { id: string; size: string; zone: Zone; consignee?: string; leave?: number }
+const body = (f: NewContainer) => ({ id: norm(f.id), size: f.size, zone: f.zone, consignee: f.consignee?.trim() || null, leave: f.leave ?? null })
 
 export const actions = {
-  /** Returns an error message, or the page to open after signing in. */
-  signIn(email: string, pw: string): { error?: string; to?: string } {
+  /** Resolves to an error message, or the page to open after signing in. */
+  async signIn(email: string, pw: string): Promise<{ error?: string; to?: string }> {
     const em = email.trim().toLowerCase()
     if (!EMAIL.test(em)) return { error: 'Enter a valid email address.' }
     if (!pw) return { error: 'Enter your password.' }
-    const u = state.users.find((x) => x.e === em && x.p === pw)
-    if (!u) return { error: 'Email or password is incorrect.' }
-    const to = nextFor(u.r)
-    set({ role: u.r, user: u, next: null })
-    toast('Welcome, ' + u.n)
-    return { to }
+    try {
+      const r = await api<{ token: string; user: ApiUser }>('/api/auth/login', { body: { email: em, password: pw } })
+      return finishAuth(r.token, r.user)
+    } catch (e) { return { error: e instanceof Error ? e.message : 'Could not sign in.' } }
   },
-  signUp(f: { n: string; e: string; p: string; p2: string; r: Role; invite: string; co: string }): { error?: string; to?: string } {
+  async signUp(f: { n: string; e: string; p: string; p2: string; r: Role; invite: string; co: string }): Promise<{ error?: string; to?: string }> {
     const n = f.n.trim(), em = f.e.trim().toLowerCase()
     if (n.length < 2) return { error: 'Enter your full name.' }
     if (!EMAIL.test(em)) return { error: 'Enter a valid email address.' }
-    if (state.users.some((x) => x.e === em)) return { error: 'That email already has an account.' }
     if (f.p.length < 8 || !/[a-z]/i.test(f.p) || !/\d/.test(f.p)) return { error: 'Use 8+ characters with a letter and a number.' }
     if (f.p !== f.p2) return { error: 'Passwords do not match.' }
-    if (f.r === 'A' && f.invite.trim() !== 'SMART-ADMIN') return { error: 'Admin accounts need the invite code SMART-ADMIN.' }
-    const u: User = { n, e: em, p: f.p, r: f.r, sg: 1, watch: [], slots: [], co: f.r === 'C' ? f.co.trim() : '' }
-    const users = [...state.users, u]
-    saveUsers(users)
-    const to = state.next || homeOf(f.r)
-    set({ users, role: f.r, user: u, next: null })
-    toast('Account created. Welcome, ' + n)
-    return { to }
+    try {
+      const r = await api<{ token: string; user: ApiUser }>('/api/auth/signup', { body: { name: n, email: em, password: f.p, role: f.r, invite: f.invite, company: f.co } })
+      return finishAuth(r.token, r.user, 'Account created. Welcome, ' + n)
+    } catch (e) { return { error: e instanceof Error ? e.message : 'Could not create the account.' } }
   },
-  signOut() { set({ role: null, user: null }) },
+  signOut() {
+    stopSync(); setToken(null); lastSync = ''
+    set({ role: null, user: null, ...emptyData(), users: [], drawer: null, online: true })
+  },
   setNext(next: string | null) { set({ next }) },
   openDrawer(d: Drawer) { set({ drawer: d }) },
   closeDrawer() { set({ drawer: null }) },
-  /** Wipes every container, vessel, task and log entry. Accounts are kept. */
-  resetData() { set({ ...emptyData() }); toast('All terminal data cleared') },
 
   /* containers */
   /** Registers a container that has arrived but is not placed yet (shows up in Placement). */
-  addContainer(f: NewContainer): boolean {
-    const id = norm(f.id)
-    if (!id) { toast('Enter a container number.', true); return false }
-    if (state.C.some((c) => c.id === id && c.st !== 'Released')) { toast(id + ' is already in the terminal.', true); return false }
-    const c: Container = { id, size: f.size, zone: f.zone, cus: 'Hold', paid: false, st: 'Pending', slot: 'Not placed', at: Date.now(), consignee: f.consignee?.trim() || undefined, leave: f.leave }
-    set({ C: [...state.C, c], drawer: null, log: withLog('Gate-in', id + ' checked in (' + f.size + ', ' + f.zone + ')', id) })
-    toast(id + ' added')
-    return true
+  async addContainer(f: NewContainer): Promise<boolean> {
+    if (!norm(f.id)) { toast('Enter a container number.', true); return false }
+    const r = await call('/api/containers', { body: body(f) }, norm(f.id) + ' added')
+    if (r) set({ drawer: null })
+    return !!r
   },
-  /** Bulk-registers containers from a manifest. Skips numbers already in the terminal. Returns how many were added. */
-  importContainers(list: NewContainer[]): number {
-    const have = new Set(state.C.filter((c) => c.st !== 'Released').map((c) => c.id))
-    const now = Date.now(), add: Container[] = []
-    for (const f of list) {
-      const id = norm(f.id)
-      if (!id || have.has(id)) continue
-      have.add(id)
-      add.push({ id, size: f.size, zone: f.zone, cus: 'Hold', paid: false, st: 'Pending', slot: 'Not placed', at: now, consignee: f.consignee?.trim() || undefined, leave: f.leave })
+  /** Bulk-registers containers from a manifest. Returns how many were added. */
+  async importContainers(list: NewContainer[]): Promise<number> {
+    const items = list.filter((f) => norm(f.id)).map(body)
+    if (!items.length) { toast('No new containers to import.', true); return 0 }
+    const r = await call<{ added: number }>('/api/containers/import', { body: { items } })
+    if (!r) return 0
+    if (!r.added) { toast('No new containers to import.', true); return 0 }
+    toast(r.added + ' containers imported')
+    return r.added
+  },
+  /** Asks the server for the best slot (nothing is changed). Resolves to null when the zone is full or the call failed. */
+  async suggestSlot(zone: Zone, leave?: number): Promise<Suggestion | null> {
+    try {
+      return await api<Suggestion>('/api/yard/suggest', { body: { zone, leave: leave ?? null } })
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) return null
+      if (e instanceof ApiError && e.status === 401) { actions.signOut(); toast('Your session ended. Please sign in again.', true); return null }
+      toast(e instanceof Error ? e.message : 'Something went wrong.', true)
+      return null
     }
-    if (!add.length) { toast('No new containers to import.', true); return 0 }
-    set({ C: [...state.C, ...add], log: withLog('Manifest', add.length + ' containers imported from manifest') })
-    toast(add.length + ' containers imported')
-    return add.length
   },
-  /** Puts a container into the suggested slot. Creates it first if it was not registered yet (Gate-In flow). */
-  placeContainer(f: NewContainer, s: Suggestion): boolean {
-    const id = norm(f.id)
-    if (!id) { toast('Enter a container number.', true); return false }
-    const slot = s.block + '-B' + (s.bay + 1) + '-T' + (s.tier + 1)
-    const at = state.C.findIndex((c) => c.id === id && c.st !== 'Released')
-    let C: Container[]
-    let log: LogEntry[]
-    if (at >= 0) {
-      if (state.C[at].st === 'In yard') { toast(id + ' is already placed at ' + state.C[at].slot + '.', true); return false }
-      C = patchC(at, { st: 'In yard', block: s.block, bay: s.bay, tier: s.tier, slot })
-      log = withLog('Placed', id + ' placed at ' + slot, id)
-    } else {
-      C = [...state.C, { id, size: f.size, zone: f.zone, cus: 'Hold', paid: false, st: 'In yard', block: s.block, bay: s.bay, tier: s.tier, slot, at: Date.now(), consignee: f.consignee?.trim() || undefined, leave: f.leave }]
-      log = [{ t: Date.now(), kind: 'Placed', id, m: id + ' checked in and placed at ' + slot }, ...state.log].slice(0, 100)
-    }
-    set({ C, log })
-    toast('Placed at ' + slot)
-    return true
+  /** The server re-runs the optimizer and puts the container into the best slot (creating it first if needed). */
+  async placeContainer(f: NewContainer, _s?: Suggestion): Promise<boolean> {
+    if (!norm(f.id)) { toast('Enter a container number.', true); return false }
+    const r = await call<{ placement: { slot: string } }>('/api/containers/place', { body: body(f) })
+    if (r) toast('Placed at ' + r.placement.slot)
+    return !!r
   },
-  deleteContainer(i: number) {
-    const c = state.C[i]
-    if (!c) return
-    let C = state.C.filter((_, k) => k !== i)
-    if (c.st === 'In yard') C = C.map((x) => (x.st === 'In yard' && x.block === c.block && x.bay === c.bay && (x.tier ?? 0) > (c.tier ?? 0) ? { ...x, tier: (x.tier ?? 1) - 1, slot: x.block + '-B' + ((x.bay ?? 0) + 1) + '-T' + (x.tier ?? 1) } : x))
-    set({ C, log: withLog('Removed', c.id + ' removed from records', c.id) })
-    toast(c.id + ' removed')
+  async deleteContainer(i: number) {
+    const id = idOf(i)
+    if (id) await call('/api/containers/' + encodeURIComponent(id), { method: 'DELETE' }, id + ' removed')
   },
-  clearCustoms(i: number) {
-    const c = state.C[i]
-    set({ C: patchC(i, { cus: 'Cleared' }), log: withLog('Customs', c.id + ' customs cleared', c.id) })
-    toast('Customs cleared')
+  async clearCustoms(i: number) {
+    const id = idOf(i)
+    if (id) await call('/api/containers/' + encodeURIComponent(id) + '/customs/clear', { method: 'POST', body: {} }, 'Customs cleared')
   },
-  clearMany(idx: number[]) {
+  async clearMany(idx: number[]) {
     if (!idx.length) return toast('Select containers first.', true)
-    set({ C: state.C.map((c, k) => (idx.includes(k) ? { ...c, cus: 'Cleared' } : c)), log: withLog('Customs', idx.length + ' containers cleared by customs') })
-    toast(idx.length + ' customs cleared')
+    const ids = idx.map(idOf).filter(Boolean)
+    await call('/api/containers/customs/clear-many', { body: { ids } }, ids.length + ' customs cleared')
   },
-  pay(i: number) {
-    const c = state.C[i]
-    set({ C: patchC(i, { paid: true }), log: withLog('Payment', 'Payment received for ' + c.id, c.id) })
-    toast('Invoice paid')
+  async pay(i: number) {
+    const id = idOf(i)
+    if (id) await call('/api/containers/' + encodeURIComponent(id) + '/pay', { method: 'POST', body: {} }, 'Invoice paid')
   },
-  release(i: number) {
-    const c = state.C[i]
-    if (c.st !== 'In yard') return toast('Only containers placed in the yard can be released.', true)
-    if (c.cus !== 'Cleared' || (due(c) > 0 && !c.paid)) return toast('Release blocked: clear customs and pay dues first.', true)
-    const C = state.C.map((x, k) => {
-      if (k === i) return { ...x, st: 'Released' as const, rel: Date.now() }
-      if (x.st === 'In yard' && x.block === c.block && x.bay === c.bay && (x.tier ?? 0) > (c.tier ?? 0)) return { ...x, tier: (x.tier ?? 1) - 1, slot: x.block + '-B' + ((x.bay ?? 0) + 1) + '-T' + (x.tier ?? 1) }
-      return x
-    })
-    set({ C, log: withLog('Gate-out', c.id + ' released', c.id) })
-    toast(c.id + ' released')
+  async release(i: number) {
+    const id = idOf(i)
+    if (id) await call('/api/containers/' + encodeURIComponent(id) + '/release', { method: 'POST', body: {} }, id + ' released')
   },
 
   /* crane tasks */
-  addTask(text: string, p: number) {
+  async addTask(text: string, p: number) {
     if (!text.trim()) return toast('Describe the task.', true)
-    set({ tasks: [...state.tasks, { id: uid(), text: text.trim(), p }], log: withLog('Task', 'Crane task added: ' + text.trim()) })
+    await call('/api/tasks', { body: { text: text.trim(), p } })
   },
-  escalate(id: string) { set({ tasks: state.tasks.map((t) => (t.id === id ? { ...t, p: Math.min(9, t.p + 1) } : t)) }) },
-  finishTask(id: string) {
-    const t = state.tasks.find((x) => x.id === id)
-    set({ tasks: state.tasks.filter((x) => x.id !== id), log: t ? withLog('Task', 'Crane task done: ' + t.text) : state.log })
-  },
+  async escalate(id: string) { await call('/api/tasks/' + id + '/escalate', { method: 'POST', body: {} }) },
+  async finishTask(id: string) { await call('/api/tasks/' + id + '/done', { method: 'POST', body: {} }) },
 
   /* vessels */
-  addVessel(v: Omit<Vessel, 'id'>): boolean {
+  async addVessel(v: Omit<Vessel, 'id'>): Promise<boolean> {
     if (!v.name.trim()) { toast('Enter the vessel name.', true); return false }
     if (!v.eta) { toast('Choose an arrival time.', true); return false }
-    set({ vessels: [...state.vessels, { ...v, name: v.name.trim(), id: uid() }].sort((a, b) => a.eta - b.eta), log: withLog('Vessel', v.name.trim() + ' scheduled for berth ' + v.berth) })
-    toast(v.name.trim() + ' added')
-    return true
+    const r = await call('/api/vessels', { body: { name: v.name.trim(), eta: v.eta, boxes: v.boxes, berth: v.berth } }, v.name.trim() + ' added')
+    return !!r
   },
-  removeVessel(id: string) { set({ vessels: state.vessels.filter((v) => v.id !== id) }) },
+  async removeVessel(id: string) { await call('/api/vessels/' + encodeURIComponent(id), { method: 'DELETE' }) },
 
   /* gate appointments */
-  bookGateSlot(i: number) {
+  async bookGateSlot(i: number) {
     const s = state.slots[i]
     if (s[1] >= 3) return toast('Slot full: three trucks per slot.', true)
-    const slots = state.slots.map((x, k) => (k === i ? ([x[0], x[1] + 1] as [string, number]) : x))
-    const days = state.days && state.days.map((d, k) => (k === state.AD ? slots : d))
-    set({ slots, days, log: withLog('Gate', 'Gate slot ' + s[0] + ' booked') })
-    toast('Booked ' + s[0])
+    await call('/api/gate/slots/' + state.AD + '/' + s[0] + '/book', { method: 'POST', body: {} }, 'Booked ' + s[0])
   },
-  setDay(i: number) {
-    const days = state.days || Array.from({ length: 7 }, (_, d) => (d === state.AD ? state.slots : initialSlots()))
-    set({ days: days.map((d, k) => (k === state.AD ? state.slots : d)), AD: i, slots: days[i] })
-  },
+  async setDay(i: number) { set({ AD: i }); lastSync = ''; await refresh() },
 
   /* client portal */
-  addShipment(raw: string) {
-    const v = norm(raw), u = currentUser()
+  async addShipment(raw: string) {
+    const v = norm(raw)
     if (!v) return toast('Enter a container number.', true)
-    if (!state.C.find((x) => x.id === v)) return toast('Container not found. Check the number.', true)
-    if ((u.watch || []).includes(v)) return toast(v + ' is already in your list.', true)
-    updateUser((x) => ({ ...x, watch: [...(x.watch || []), v] }))
-    toast(v + ' added')
+    if ((currentUser().watch || []).includes(v)) return toast(v + ' is already in your list.', true)
+    await call('/api/me/shipments', { body: { container_id: v } }, v + ' added')
   },
-  removeShipment(id: string) { updateUser((u) => ({ ...u, watch: (u.watch || []).filter((x) => x !== id) })) },
-  bookClientSlot(b: Booking): string | null {
-    const c = state.C.find((x) => x.id === b.id)
+  async removeShipment(id: string) { await call('/api/me/shipments/' + encodeURIComponent(id), { method: 'DELETE' }) },
+  /** Resolves to an error message, or null when the slot was booked. */
+  async bookClientSlot(b: Booking): Promise<string | null> {
     if (!b.d) return 'Choose a date.'
-    if (b.t === 'Pickup' && c && (c.cus !== 'Cleared' || (due(c) && !c.paid))) return 'Pickup needs customs cleared and dues paid.'
-    updateUser((u) => ({ ...u, slots: [...(u.slots || []), b] }))
-    if (c && b.t === 'Pickup') set({ C: state.C.map((x) => (x === c ? { ...x, bk: true } : x)) })
-    toast('Slot booked for ' + b.id)
-    return null
+    try {
+      await api('/api/me/bookings', { body: { container_id: b.id, purpose: b.t, date: b.d, time_range: b.s } })
+      lastSync = ''; await refresh(); toast('Slot booked for ' + b.id)
+      return null
+    } catch (e) { return e instanceof Error ? e.message : 'Could not book the slot.' }
   },
-  cancelBooking(i: number) { updateUser((u) => ({ ...u, slots: (u.slots || []).filter((_, k) => k !== i) })) },
-  payClient(id: string) {
-    set({ C: state.C.map((c) => (c.id === id ? { ...c, paid: true } : c)), log: withLog('Payment', 'Payment received for ' + id, id) })
-    toast('Payment received for ' + id)
+  async cancelBooking(i: number) {
+    const bid = currentUser().slots?.[i]?.bid
+    if (bid) await call('/api/me/bookings/' + bid, { method: 'DELETE' })
   },
+  async payClient(id: string) { await call('/api/me/shipments/' + encodeURIComponent(id) + '/pay', { method: 'POST', body: {} }, 'Payment received for ' + id) },
+}
+
+function finishAuth(token: string, u: ApiUser, msg?: string): { to: string } {
+  setToken(token); lastSync = ''
+  const user = toUser(u)
+  const to = nextFor(u.role)
+  set({ role: u.role, user, next: null, ...emptyData(), online: true })
+  startSync()
+  toast(msg || 'Welcome, ' + u.name)
+  return { to }
 }
 export { settled }

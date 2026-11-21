@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { BAYS, CAPACITY, Container, MAX_TIER, YARD_BLOCKS, ZONES, Zone } from '../lib/data'
-import { ago, dwell, inYard, perWeekday, stackAt, suggest, Suggestion } from '../lib/logic'
+import { ago, dwell, inYard, perWeekday, stackAt, Suggestion } from '../lib/logic'
 import { actions, toast, useStore } from '../lib/store'
 import { Bars, Icon, Pill, Table } from '../components/ui'
 
@@ -198,8 +198,8 @@ export function YardMap() {
     if (!c) { setMsg('Not in the yard: ' + (q.trim() || 'enter a number')); return }
     setSel({ block: c.block!, bay: c.bay! }); setMark(null); setMsg(c.id + ' is at ' + c.slot)
   }
-  const sug = () => {
-    const s: Suggestion | null = suggest(C, undefined, zone)
+  const sug = async () => {
+    const s: Suggestion | null = await actions.suggestSlot(zone)
     if (!s) { setMsg('No free slot left in the ' + zone + ' zone.'); setMark(null); return }
     setMark({ block: s.block, bay: s.bay }); setSel(null); setMsg(`Best slot: ${s.block}, bay ${s.bay + 1}, tier ${s.tier + 1}`)
   }
@@ -282,13 +282,13 @@ export function Vessels() {
     }
     rd.readAsText(fl)
   }
-  const importRows = () => {
+  const importRows = async () => {
     if (!rows) return
-    const n = actions.importContainers(rows.slice(1).map((r) => ({ id: r[0] || '', size: r[1] || '40 ft', zone: zoneOf(r[1] || ''), consignee: r[3] })))
+    const n = await actions.importContainers(rows.slice(1).map((r) => ({ id: r[0] || '', size: r[1] || '40 ft', zone: zoneOf(r[1] || ''), consignee: r[3] })))
     if (n) setRows(null)
   }
-  const add = () => {
-    if (actions.addVessel({ name: f.name, eta: f.eta ? new Date(f.eta).getTime() : 0, boxes: Number(f.boxes) || 0, berth: f.berth })) setF({ name: '', eta: '', boxes: '', berth: f.berth })
+  const add = async () => {
+    if (await actions.addVessel({ name: f.name, eta: f.eta ? new Date(f.eta).getTime() : 0, boxes: Number(f.boxes) || 0, berth: f.berth })) setF({ name: '', eta: '', boxes: '', berth: f.berth })
   }
   const max = Math.max(1, ...vessels.map((v) => v.boxes))
   return (

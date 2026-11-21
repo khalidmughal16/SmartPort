@@ -13,3 +13,11 @@ def settled(days_in_yard: int, paid: bool) -> bool:
 
 def can_release(customs: str, days_in_yard: int, paid: bool) -> bool:
     return customs == "Cleared" and settled(days_in_yard, paid)
+
+
+DAY_MS = 86_400_000
+
+
+def dwell_days(at_ms: float, rel_ms: float | None, now_ms: float) -> int:
+    """Whole days a container has been in the terminal (until release, if released)."""
+    return max(0, int(((rel_ms if rel_ms is not None else now_ms) - at_ms) // DAY_MS))

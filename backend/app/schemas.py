@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import re
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
-import re
 
 Role = Literal["A", "G", "Y", "D", "B", "C"]
+Zone = Literal["General", "Hazardous", "Refrigerated"]
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -41,29 +42,44 @@ class SignupIn(_Email):
 
 
 class ContainerIn(BaseModel):
-    id: str = Field(min_length=3, max_length=20)
-    hazard: bool = False
+    """A container arriving at the terminal (Gate-In), or one row of a manifest."""
+    id: str = Field(min_length=1, max_length=24)
+    size: str = Field(default="40 ft", max_length=20)
+    zone: Zone = "General"
+    consignee: Optional[str] = Field(default=None, max_length=80)
+    leave: Optional[int] = Field(default=None, description="Planned pick-up time, ms since epoch")
+
+
+class ImportIn(BaseModel):
+    items: list[ContainerIn] = Field(max_length=5000)
+
+
+class IdsIn(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
 
 
 class SuggestIn(BaseModel):
-    leave_day: int = Field(ge=1, le=60, description="Day the container is expected to leave")
-    hazard: bool = False
-
-
-class PlaceIn(SuggestIn):
-    container_id: str
-
-
-class CheckInIn(BaseModel):
-    container_id: str = Field(min_length=3, max_length=20)
-    truck: str = Field(min_length=1, max_length=20)
-    type: Literal["40 ft HC", "20 ft", "Reefer"] = "40 ft HC"
-    hazard: bool = False
+    zone: Zone = "General"
+    leave: Optional[int] = None
 
 
 class TaskIn(BaseModel):
-    title: str = Field(min_length=3, max_length=120)
-    priority: int = Field(ge=1, le=9, default=3)
+    text: str = Field(min_length=3, max_length=120)
+    p: int = Field(ge=1, le=9, default=3)
+
+
+class VesselIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    eta: int = Field(gt=0, description="Arrival time, ms since epoch")
+    boxes: int = Field(ge=0, default=0, le=100000)
+    berth: str = Field(min_length=1, max_length=10)
+
+
+class CheckInIn(BaseModel):
+    container_id: str = Field(min_length=3, max_length=24)
+    truck: str = Field(min_length=1, max_length=20)
+    size: str = "40 ft"
+    zone: Zone = "General"
 
 
 class RouteIn(BaseModel):
@@ -78,4 +94,4 @@ class BookingIn(BaseModel):
     container_id: str
     purpose: Literal["Pickup", "Drop-off"] = "Pickup"
     date: str = Field(min_length=8, max_length=10, description="YYYY-MM-DD")
-    time_range: str = "08:00-09:00"
+    time_range: str = Field(default="08:00-09:00", max_length=20)

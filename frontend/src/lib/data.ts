@@ -68,7 +68,7 @@ export interface Container {
 export interface Vessel { id: string; name: string; eta: number; boxes: number; berth: string }
 export interface Task { id: string; text: string; p: number }
 export interface LogEntry { t: number; kind: string; id?: string; m: string }
-export interface Booking { id: string; t: string; d: string; s: string }
+export interface Booking { id: string; t: string; d: string; s: string; bid?: number }
 export interface User {
   n: string; e: string; p: string; r: Role; sg?: 1; watch?: string[]; slots?: Booking[]; co?: string
 }

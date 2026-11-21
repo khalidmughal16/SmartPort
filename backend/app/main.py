@@ -1,11 +1,12 @@
 """SmartPort API (FastAPI + in-memory DSA structures, no SQL). Run:  uvicorn app.main:app --reload   (docs at http://localhost:8000/docs)"""
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .store import store
-from .routers import admin, auth, client, containers, gate, reports, route, tasks, yard
+from .routers import admin, auth, client, containers, gate, reports, route, state, tasks, vessels, yard
 
 
 @asynccontextmanager
@@ -16,7 +17,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="SmartPort API", version="1.0.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?", allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origin_regex=os.environ.get("SMARTPORT_CORS", r"http://(localhost|127\.0\.0\.1)(:\d+)?"), allow_methods=["*"], allow_headers=["*"])
 
 
 @app.middleware("http")
@@ -28,7 +29,7 @@ async def autosave(request, call_next):
     return response
 
 
-for r in (auth, containers, yard, gate, tasks, route, reports, client, admin):
+for r in (auth, state, containers, yard, gate, tasks, vessels, route, reports, client, admin):
     app.include_router(r.router)
 
 

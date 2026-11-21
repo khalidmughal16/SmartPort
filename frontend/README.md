@@ -14,3 +14,8 @@ docs@smartport.pk / Docs@123, billing@smartport.pk / Bill@123, client@smartport.
 - `_old/`            unused files from earlier experiments (Vite App.tsx, three.js Landing, WorkflowTunnel); not part of the build
 - `src/components`   shell, auth, drawers, landing sections; `src/views` the 17 app views
 - `src/lib`          data, logic (dues, placement), store (state + actions), world (film SVG)
+
+## Backend connection
+The app needs the FastAPI backend (`../backend`). It calls `http://localhost:8000` unless `NEXT_PUBLIC_API_URL` is set
+(see `.env.local.example`). State comes from `GET /api/state` (see `src/lib/store.ts`, `src/lib/api.ts`).
+Run both with `start-all.bat` in the project root.

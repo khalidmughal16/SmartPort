@@ -516,3 +516,4 @@ div.yc{cursor:default}.yc:not(.f):hover{border-color:var(--zc)}
 .ph-veil{position:absolute;inset:0;pointer-events:none;opacity:calc(var(--o)*1.25);background:linear-gradient(#06122f,#0a1a4a)}
 :root[data-theme=light] .ph-veil{background:linear-gradient(#bddcf8,#e6f2fc)}
 @media(prefers-reduced-motion:reduce){.ph-veil{display:none}}
+.offline{margin:0 0 16px;padding:10px 14px;border-radius:10px;border:1px solid var(--bad);color:var(--bad);font-size:14px;background:color-mix(in srgb,var(--bad) 10%,transparent)}.offline code{font-family:ui-monospace,monospace}
