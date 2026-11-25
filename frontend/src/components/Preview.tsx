@@ -7,7 +7,7 @@ const rnd = (n: number) => Math.floor(Math.random() * n)
 const pad = (n: number) => String(n).padStart(2, '0')
 const KPIS = [
   { l: 'Containers in yard', v: 212, f: (v: number) => String(v) }, { l: 'Past free days', v: 3, f: (v: number) => String(v) },
-  { l: 'Gate-ins today', v: 12, f: (v: number) => String(v) }, { l: 'Storage dues open', v: 1350, f: (v: number) => '$' + v.toLocaleString('en-US') },
+  { l: 'Gate-ins today', v: 12, f: (v: number) => String(v) }, { l: 'Storage dues open', v: 27500, f: (v: number) => 'PKR ' + v.toLocaleString('en-US') },
 ]
 const SN = ['working', 'idle', 'maintenance'], SC = ['ok', '', 'x']
 const gmt = () => 'GMT-00' + pad(10 + rnd(89))
@@ -24,7 +24,7 @@ export function Preview() {
   const [flash, setFlash] = useState<{ i: number; n: number }>({ i: -1, n: 0 })
   const [showM, setShowM] = useState(true), [showS, setShowS] = useState(true)
   const [grown, setGrown] = useState(false)
-  const [cranes, setCranes] = useState([{ n: 'Crane 1', s: 0, u: 82 }, { n: 'Crane 2', s: 0, u: 64 }, { n: 'Crane 3', s: 1, u: 0 }, { n: 'Crane 4', s: 2, u: 0 }])
+  const [cranes, setCranes] = useState([{ n: 'Gate 1', s: 0, u: 82 }, { n: 'Gate 2', s: 0, u: 64 }, { n: 'Gate 3', s: 1, u: 0 }, { n: 'Gate 4', s: 2, u: 0 }])
   const [feed, setFeed] = useState<[string, ReactNode][]>([])
   const live = useRef(false), counted = useRef(false), valsRef = useRef(vals)
   valsRef.current = vals
@@ -85,7 +85,7 @@ export function Preview() {
             <div className="sx-cols" style={{ height: 200 }}>
               {DAYS.map((d, i) => (
                 <div className="sx-col" key={d} tabIndex={0} aria-label={`${d}: manual ${MAN[i]}, smart ${SM[i]}`}>
-                  <div className="tt">{d}: <b>{MAN[i]}</b> manual, <b style={{ color: 'var(--lime)' }}>{SM[i]}</b> smart</div>
+                  <div className="tt">{d}: <b>{MAN[i]}</b> manual, <b style={{ color: 'var(--acc)' }}>{SM[i]}</b> smart</div>
                   <div className={`sx-bar${showM ? '' : ' hide'}`} style={{ height: h(MAN[i]) }}><em>{showM ? MAN[i] : ''}</em></div>
                   <div className={`sx-bar s${showS ? '' : ' hide'}`} style={{ height: h(SM[i]) }}><em>{showS ? SM[i] : ''}</em></div>
                 </div>
@@ -94,7 +94,7 @@ export function Preview() {
             <div className="sx-xl">{DAYS.map((d) => <span key={d}>{d}</span>)}</div>
           </div>
           <div className="sx-p">
-            <h4>Crane status<span className="sx-mut" style={{ fontWeight: 400, fontSize: 13 }}>{cranes.filter((c) => c.s === 0).length} of 4 active</span></h4>
+            <h4>Gate status<span className="sx-mut" style={{ fontWeight: 400, fontSize: 13 }}>{cranes.filter((c) => c.s === 0).length} of 4 active</span></h4>
             <div className="sx-cr">
               {cranes.map((c, i) => (
                 <button key={c.n} className={c.s === 2 ? 'x' : ''} aria-label={`${c.n} ${SN[c.s]}. Press to change.`}
@@ -109,7 +109,7 @@ export function Preview() {
                 </button>
               ))}
             </div>
-            <p className="sx-hint">Tap a crane to change its status.</p>
+            <p className="sx-hint">Tap a gate to change its status.</p>
           </div>
         </div>
         <div className="sx-p" style={{ marginTop: 12 }}>

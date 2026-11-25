@@ -223,7 +223,7 @@ export function Roles() {
       <svg className="rbg" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax slice" aria-hidden="true" dangerouslySetInnerHTML={{ __html: ROLES_BG }} />
       <div className="rb">
         <div className="rbt">
-          <p className="sub" style={{ marginBottom: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontSize: 12 }}><b style={{ color: 'var(--lime)', fontWeight: 600 }}>Client portal</b> . Feature belt</p>
+          <p className="sub" style={{ marginBottom: 10, letterSpacing: '.14em', textTransform: 'uppercase', fontSize: 12 }}><b style={{ color: 'var(--acc)', fontWeight: 600 }}>Client portal</b> . Feature belt</p>
           <h2>One portal. <em>Your containers.</em></h2>
           <p className="sub">Hover to stop the belt, flick to spin it, pick a feature to see what you can do.</p>
           <ul className="rl" id="rlg" aria-label="Client features">

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { rnd } from '../lib/data'
 import { dwell, due } from '../lib/logic'
-import { ZONES, Zone } from '../lib/data'
+import { ZONES, Zone, pkr } from '../lib/data'
 import { actions, toast, useStore } from '../lib/store'
 
 /** Right-hand drawer: container details, gate ticket, and the add-container wizard. */
@@ -45,7 +45,7 @@ function Detail({ c }: { c: ReturnType<typeof useStore>['C'][number] }) {
         <rect x="24" y="86" width="20" height="6" fill="currentColor" /><rect x="196" y="86" width="20" height="6" fill="currentColor" />
       </svg>
       <h3>{c.id}</h3>
-      <p className="sub">{c.size}, {c.zone} zone, {dwell(c)} days in yard, dues ${due(c)}{c.consignee ? ', consignee ' + c.consignee : ''}</p>
+      <p className="sub">{c.size}, {c.zone} zone, {dwell(c)} days in yard, dues {pkr(due(c))}{c.consignee ? ', consignee ' + c.consignee : ''}</p>
       <ol className="tl">{ev.map((x) => <li key={x[0]}><b>{x[0]}</b><span>{x[1]}</span></li>)}</ol>
     </>
   )
@@ -67,7 +67,7 @@ function Ticket({ time }: { time: string }) {
 
 function AddWizard() {
   const [step, setStep] = useState(0)
-  const [f, setF] = useState<{ n: string; t: string; z: Zone; cn: string; lv: string }>({ n: '', t: '40 ft HC', z: 'General', cn: '', lv: '' })
+  const [f, setF] = useState<{ n: string; t: string; z: Zone; cn: string; lv: string; w: string }>({ n: '', t: '40 ft HC', z: 'General', cn: '', lv: '', w: '' })
   const names = ['Details', 'Cargo', 'Review']
   const next = () => {
     if (step === 0 && !f.n.trim()) return toast('Enter a container number.', true)
@@ -89,6 +89,8 @@ function AddWizard() {
         <>
           <label htmlFor="az">Cargo zone</label>
           <select id="az" value={f.z} onChange={(e) => setF({ ...f, z: e.target.value as Zone })}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select>
+          <label htmlFor="aw">Weight in kg (optional)</label>
+          <input id="aw" type="number" min="0" max="100000" value={f.w} placeholder="e.g. 18000" onChange={(e) => setF({ ...f, w: e.target.value })} />
           <label htmlFor="ac">Consignee</label>
           <input id="ac" value={f.cn} placeholder="Company name" onChange={(e) => setF({ ...f, cn: e.target.value })} />
           <label htmlFor="al">Planned pick-up date (optional)</label>
@@ -103,7 +105,7 @@ function AddWizard() {
       )}
       <p style={{ marginTop: 14 }}>
         {step > 0 && <><button className="btn" onClick={() => setStep(step - 1)}>Back</button>{' '}</>}
-        {step < 2 ? <button className="btn p" onClick={next}>Next</button> : <button className="btn p" onClick={() => actions.addContainer({ id: f.n, size: f.t, zone: f.z, consignee: f.cn, leave: f.lv ? new Date(f.lv + 'T12:00').getTime() : undefined })}>Add container</button>}
+        {step < 2 ? <button className="btn p" onClick={next}>Next</button> : <button className="btn p" onClick={() => actions.addContainer({ id: f.n, size: f.t, zone: f.z, consignee: f.cn, leave: f.lv ? new Date(f.lv + 'T12:00').getTime() : undefined, weight: f.w ? Number(f.w) : undefined })}>Add container</button>}
       </p>
     </>
   )

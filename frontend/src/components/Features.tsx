@@ -13,9 +13,9 @@ const F = [
   { t: 'Smart placement', s: 'Scores every free slot so no container is buried under another.', i: 'M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73zM12 22V12M3.29 7 12 12l8.71-5M7.5 4.27l9 5.15' },
   { t: 'Customs control', s: 'No release until documents are cleared and dues are paid.', i: 'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4' },
   { t: 'Gate flow', s: 'Check in trucks, book slots and print tickets in seconds.', i: 'M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14M19 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM9 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0z' },
-  { t: 'Crane dispatch', s: 'A priority queue puts the most urgent pickup first.', i: 'M4 21h16M7 21V5h11M7 5 3 10M18 5v9M16 14h4v4h-4z' },
-  { t: 'Billing', s: 'Free days, daily storage charges and invoices, automatic.', i: 'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11' },
-  { t: 'Reports', s: 'Compare random and smart placement and export the numbers.', i: 'M3 3v18h18M7 14v4M12 9v9M17 5v13' },
+  { t: 'Appointments', s: 'Upcoming pickups are handled in time order, earliest first.', i: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2' },
+  { t: 'Billing', s: 'Three free days, then daily storage charges in PKR, automatic.', i: 'M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1ZM16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8M12 17.5v-11' },
+  { t: 'Reports', s: 'Compare random placement with the approved rules and export the numbers.', i: 'M3 3v18h18M7 14v4M12 9v9M17 5v13' },
 ]
 
 const Head = ({ t, p, children }: { t: string; p: string; children?: ReactNode }) => (
@@ -69,7 +69,7 @@ function Placement() {
       <div className="sx-msg" aria-live="polite">{msg}</div>
       <div className="sx-stat">
         <div><b>{tot.r}</b><span>Extra moves, random</span></div>
-        <div><b style={{ color: 'var(--lime)' }}>{tot.s}</b><span>Extra moves, optimizer</span></div>
+        <div><b style={{ color: 'var(--acc)' }}>{tot.s}</b><span>Extra moves, optimizer</span></div>
       </div>
     </>
   )
@@ -84,7 +84,7 @@ function Customs() {
   const left = docs.filter((d) => !d[1])
   const release = () => {
     if (left.length) { setMsg(<><b style={{ color: 'var(--bad)' }}>Blocked.</b> {left.length} item{left.length > 1 ? 's' : ''} still pending: {left.map((d) => d[0].toLowerCase()).join(', ')}.</>); setShake(shake + 1) }
-    else setMsg(<><b style={{ color: 'var(--lime)' }}>Released.</b> GMT-0042 is cleared for gate-out. Audit trail saved.</>)
+    else setMsg(<><b style={{ color: 'var(--acc)' }}>Released.</b> GMT-0042 is cleared for gate-out. Audit trail saved.</>)
   }
   return (
     <>
@@ -142,35 +142,37 @@ function Gate() {
   )
 }
 
-/* 3 - crane queue */
-type Job = { id: number; u: number }
+/* 3 - appointments (min-heap: earliest first) */
+type Job = { id: number; t: number }   // t = minutes after midnight
+const hhmm = (m: number) => pad(Math.floor(m / 60)) + ':' + pad(m % 60)
+const byTime = (a: Job[]) => [...a].sort((x, y) => x.t - y.t)
 function Crane() {
-  const [q, setQ] = useState<Job[]>([{ id: 42, u: 1 }, { id: 17, u: 0 }, { id: 31, u: 0 }, { id: 9, u: 0 }, { id: 21, u: 0 }])
+  const [q, setQ] = useState<Job[]>(byTime([{ id: 42, t: 480 }, { id: 17, t: 540 }, { id: 31, t: 600 }, { id: 9, t: 660 }, { id: 21, t: 780 }]))
   const [going, setGoing] = useState(false)
-  const [msg, setMsg] = useState<ReactNode>('Queue is sorted by priority.')
-  const dispatch = () => {
+  const [msg, setMsg] = useState<ReactNode>('Appointments are listed in time order, earliest first.')
+  const handle = () => {
     if (!q.length || going) return
-    setGoing(true); setMsg(<>Crane {1 + rnd(3)} picking <b>GMT-00{pad(q[0].id)}</b> for Gate 2.</>)
+    setGoing(true); setMsg(<>Handling <b>GMT-00{pad(q[0].id)}</b> at <b>{hhmm(q[0].t)}</b> at Gate {1 + rnd(3)}.</>)
     setTimeout(() => {
-      const n = q.slice(1); while (n.length < 5) n.push({ id: 10 + rnd(89), u: 0 })
-      setQ(n); setGoing(false)
+      const n = q.slice(1); while (n.length < 5) n.push({ id: 10 + rnd(89), t: (n.length ? n[n.length - 1].t : 480) + 60 })
+      setQ(byTime(n)); setGoing(false)
     }, RM ? 0 : 340)
   }
-  const rush = () => {
-    const id = 10 + rnd(89)
-    setQ([{ id, u: 1 }, ...q.filter((x) => x.id !== id)].slice(0, 5)); setMsg(<>Rush pickup <b>GMT-00{pad(id)}</b> moved to P1.</>)
+  const early = () => {
+    const id = 10 + rnd(89), t = Math.max(420, (q[0]?.t ?? 480) - 30)
+    setQ(byTime([{ id, t }, ...q.filter((x) => x.id !== id)]).slice(0, 5)); setMsg(<>New booking <b>GMT-00{pad(id)}</b> at <b>{hhmm(t)}</b> goes to the front of the line.</>)
   }
   return (
     <>
-      <Head t="Crane dispatch queue" p="Most urgent first. Add a rush job and watch it jump the line.">
-        <button className="sx-btn" onClick={rush}>Add urgent pickup</button><button className="sx-btn p" onClick={dispatch}>Dispatch next</button>
+      <Head t="Appointments" p="Earliest first. Add an earlier booking and watch it move to the front.">
+        <button className="sx-btn" onClick={early}>Add earlier booking</button><button className="sx-btn p" onClick={handle}>Handle next</button>
       </Head>
       <div className="sx-list">
         {q.map((x, i) => (
           <div key={x.id} className={`sx-row${i === 0 ? ' on' : ''}${i === 0 && going ? ' go' : ''}`}>
             <span className="ck">{i === 0 && <Check />}</span>
-            <span className="t">GMT-00{pad(x.id)}{x.u ? <span className="sx-pill w" style={{ marginLeft: 6 }}>rush</span> : null}</span>
-            <span className="r">P{i + 1}</span>
+            <span className="t">GMT-00{pad(x.id)}</span>
+            <span className="r">{hhmm(x.t)}</span>
           </div>
         ))}
       </div>
@@ -182,7 +184,7 @@ function Crane() {
 /* 4 - storage invoice */
 function Billing() {
   const [d, setD] = useState(3)
-  const rate = 25, free = 5, c = Math.max(0, d - free)
+  const rate = 2500, free = 3, c = Math.max(0, d - free)
   return (
     <>
       <Head t="Storage invoice" p="Drag to change how long the container has been in the yard." />
@@ -197,8 +199,8 @@ function Billing() {
       <div className="sx-inv">
         <div><span>Free days</span><span>{Math.min(d, free)} of {free}</span></div>
         <div><span>Chargeable days</span><span>{c}</span></div>
-        <div><span>Rate per day</span><span>${rate}</span></div>
-        <div><span>Total due</span><span style={{ color: c ? 'var(--warn)' : 'var(--lime)' }}>${c * rate}</span></div>
+        <div><span>Rate per day (40 ft, general)</span><span>PKR {rate.toLocaleString('en-US')}</span></div>
+        <div><span>Total due</span><span style={{ color: c ? 'var(--warn)' : 'var(--acc)' }}>PKR {(c * rate).toLocaleString('en-US')}</span></div>
       </div>
     </>
   )

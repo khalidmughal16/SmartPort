@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { P, R, Role, staffPages, YARD_BLOCKS } from '../lib/data'
+import { FREE_DAYS, P, R, Role, staffPages, YARD_BLOCKS, pkr } from '../lib/data'
 import { due, dwell, perWeekday, stackAt } from '../lib/logic'
 import { actions, useStore } from '../lib/store'
 import { Bars, Pill, Table } from '../components/ui'
@@ -9,7 +9,7 @@ export function CustomsBilling() {
   const { C } = useStore()
   return (
     <Table head={['Container', 'Customs', 'Dwell', 'Dues', 'Actions']} rows={C.map((c, i) => [
-      c.id, <Pill k={c.cus === 'Cleared' ? 'ok' : 'w'}>{c.cus}</Pill>, dwell(c) + ' d', '$' + due(c) + (c.paid ? ' (paid)' : ''),
+      c.id, <Pill k={c.cus === 'Cleared' ? 'ok' : 'w'}>{c.cus}</Pill>, dwell(c) + ' d', pkr(due(c)) + (c.paid ? ' (paid)' : ''),
       <>
         <button className="btn" onClick={() => actions.clearCustoms(i)}>Clear</button>{' '}
         <button className="btn" onClick={() => actions.pay(i)}>Pay</button>{' '}
@@ -24,10 +24,10 @@ export function Reports() {
   const [tab, setTab] = useState(0)
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
   const inn = perWeekday(C.map((c) => c.at)), out = perWeekday(C.filter((c) => c.rel).map((c) => c.rel as number))
-  // Expected extra crane moves: containers stacked above one that leaves earlier.
+  // Blockers: containers stacked above one that leaves earlier (each one is an extra move later).
   const extra = YARD_BLOCKS.map((b): [string, number] => {
     let n = 0
-   for (let bay = 0; bay < b.stacks; bay++) {
+    for (let bay = 0; bay < b.stacks; bay++) {
       const st = stackAt(C, b.id, bay)
       st.forEach((c, i) => { if (c.leave) n += st.slice(i + 1).filter((x) => (x.leave ?? Infinity) > (c.leave as number)).length })
     }
@@ -43,7 +43,7 @@ export function Reports() {
       </div>
       {tab === 0 && (
         <div className="tile">
-          <b>Expected extra crane moves in the current stacks</b>
+          <b>Blockers (extra moves) in the current stacks</b>
           <p className="sub">Counts containers sitting on top of one that leaves earlier. Needs planned pick-up dates on containers.</p>
           <Bars max={Math.max(1, ...extra.map((e) => e[1]))} rows={extra.map(([k, v]) => [k, v, v === 0])} />
         </div>
@@ -52,8 +52,8 @@ export function Reports() {
       {tab === 2 && (
         <div className="tile">
           <b>Storage revenue</b>
-          <Bars max={Math.max(1, total)} rows={[['Accrued', total], ['Paid', paid, true], ['Open', total - paid]]} />
-          <p className="sub">Storage dues only: 5 free days, then $45 per day, from your container records.</p>
+          <Bars max={Math.max(1, total)} rows={[['Accrued ' + pkr(total), total], ['Paid ' + pkr(paid), paid, true], ['Open ' + pkr(total - paid), total - paid]]} />
+          <p className="sub">Storage dues only, in PKR: {FREE_DAYS} free days, then chargeable days x the daily tariff for the container size and cargo type.</p>
         </div>
       )}
     </>

@@ -14,8 +14,8 @@ function Result({ s, f, onDone }: { s: Suggestion | null | undefined; f: NewCont
   if (!s) return <p>No valid stack is free in the {f.zone} zone for a {f.size} container{f.weight ? ' of ' + f.weight.toLocaleString('en-US') + ' kg' : ''} (zone, height, size and weight rules). Release a container first.</p>
   return (
     <>
-      <p><b>Block {s.block}, stack {s.bay + 1}, tier {s.tier + 1}</b> in the {s.zone} zone. Extra moves: {s.e}.</p>
-            <button className="btn p" onClick={async () => { if (await actions.placeContainer(f, s)) onDone?.() }}>Confirm placement</button>
+      <p><b>Block {s.block}, stack {s.bay + 1}, tier {s.tier + 1}</b> in the {s.zone} zone. Extra moves: {s.e}. {s.reason ?? ''}</p>
+      <button className="btn p" onClick={async () => { if (await actions.placeContainer(f, s)) onDone?.() }}>Confirm placement</button>
     </>
   )
 }

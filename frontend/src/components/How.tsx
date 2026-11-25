@@ -5,7 +5,7 @@ const RM = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-mot
 const STEPS = [
   { t: 'Arrive', em: 'Vessel in, cargo moving.', p: 'The vessel is discharged and the cargo is shuttled by rail and truck to the dry port.', l: ['Vessel tracker with live ETA', 'Rail shuttle route and truck count'], c: ['On vessel', 'Berth B-3', '0', '0'] },
   { t: 'Clear', em: 'Gate and customs, logged.', p: 'Trucks check in at the gate and documents go through customs, with a full audit trail.', l: ['Driver and plate verified', 'Release blocked until documents clear'], c: ['Customs hold', 'Customs desk', '0', '1'] },
-  { t: 'Place', em: 'The optimizer picks the slot.', p: 'Every free slot is scored, and the container goes to the best Bay, Row and Tier.', l: ['No container buried under another', 'Fewer extra crane moves later'], c: ['Slot assigned', 'Bay 7, tier 2', '0', '2'] },
+  { t: 'Place', em: 'The optimizer picks the slot.', p: 'Every free slot is scored, and the container goes to the best Bay, Row and Tier.', l: ['No container buried under another', 'Fewer extra moves later'], c: ['Slot assigned', 'Bay 7, tier 2', '0', '2'] },
   { t: 'Release', em: 'Paid, booked, out the gate.', p: 'Dues are paid, the truck is booked and the container leaves the gate.', l: ['Free days and storage charges applied', 'Gate-out recorded in the log'], c: ['Released', 'Gate-out', '0', '5'] },
 ]
 const DUR = 4200

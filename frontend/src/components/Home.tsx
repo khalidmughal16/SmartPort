@@ -4,17 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { film } from '../lib/film'
 import { Features } from './Features'
-import { Film } from './Film'
 import { How } from './How'
 import { Nav } from './Nav'
 import { PortHero } from './PortHero'
 import { Preview } from './Preview'
 import { Roles } from './Roles'
 
-const MODULES = ['Smart Placement', 'Yard Map', 'Gate-In', 'Appointments', 'Crane Dispatch', 'Customs Control', 'Container Tracker', 'Billing', 'Reports']
+const MODULES = ['Smart Placement', 'Yard Map', 'Gate-In', 'Appointments', 'Customs Control', 'Container Tracker', 'Billing', 'Reports']
 const FAQ: [string, string][] = [
   ['What is a dry port?', 'An inland container terminal linked to a seaport by rail or road. It clears cargo away from the coast and keeps the seaport moving.'],
-  ['What does the optimizer do?', 'It scores every free slot and picks the one that blocks the fewest containers, so later pickups need fewer extra crane moves.'],
+  ['What does the optimizer do?', 'It scores every free slot and picks the one that blocks the fewest containers, so later pickups need fewer extra moves.'],
   ['Can a container leave without customs clearance?', 'No. Release is blocked until customs is cleared and storage dues are paid.'],
   ['Who can use SmartPort?', 'Clients: shippers and consignees. Create a client account to track your containers, book gate slots and pay dues online. You only see your own containers.'],
   ['Is this real data?', 'Yes, it is your own data. The terminal starts empty and keeps what you enter in this browser. There is no shared server yet.'],
@@ -26,7 +25,12 @@ export function Home() {
   useEffect(() => {
     const behavior = reduce ? 'auto' : 'smooth'
     if (pathname === '/app/roles' || pathname === '/app/faq') document.getElementById(pathname.slice(5))?.scrollIntoView({ behavior, block: 'start' })
-    else if (pathname === '/app/journey') { scrollTo({ top: 0, behavior }); film.go(1) }
+    else if (pathname === '/app/journey') {
+      // jump to the point where the laptop is fully zoomed in, so the slider is on screen and playing
+      const ph = document.querySelector('.ph') as HTMLElement | null
+      const top = ph ? ph.offsetTop + (ph.offsetHeight - innerHeight) * 0.92 : 0
+      scrollTo({ top, behavior }); film.go(1)
+    }
     else scrollTo(0, 0)
   }, [pathname])
 
@@ -36,7 +40,6 @@ export function Home() {
       <a href="#main" style={{ position: 'absolute', left: -999 }} onFocus={(e) => (e.currentTarget.style.left = '8px')}>Skip to content</a>
       <Nav />
       <PortHero />
-      <Film />
       <section className="sec">
         <p className="k">Smarter moves, stronger connections</p>
         <h2>Built for the next generation of inland logistics.</h2>

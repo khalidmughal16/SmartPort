@@ -95,17 +95,19 @@ export function Film() {
       $('#c3').textContent = i === 4 ? Math.round(7 * t) : i === 5 ? Math.round(7 * (1 - cl(t * 2))) : '0'
     }
 
-    const goSlide = (i: number) => { AP = (i + 0.02) / 10; last = -1; frame() }
-    const setSlide = (x: number) => { AP = cl(x, 0, 0.9999); last = -1; frame() }
+    const pub = () => { film.p = AP; film.subs.forEach((f) => f()) }
+    const goSlide = (i: number) => { AP = (i + 0.02) / 10; last = -1; frame(); pub() }
+    const setSlide = (x: number) => { AP = cl(x, 0, 0.9999); last = -1; frame(); pub() }
     film.go = goSlide; film.set = setSlide
 
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick)
       const dt = Math.min(1000, t - AT || 0); AT = t
-      if (!visible || hold || document.hidden || reduced) return
+      // keep time running even while the hero laptop is on screen, so the slider never restarts when you zoom in
+      if (hold || document.hidden || reduced) return
       AP += dt / (SLIDE_MS * 10)
       if (AP >= 1) AP = 0
-      if (t - LF >= 45) { LF = t; frame() }
+      if (t - LF >= 45) { LF = t; if (visible) frame(); pub() }
     }
     const onMsg = (e: MessageEvent) => {
       if (e.data?.type !== 'sp-hold') return
