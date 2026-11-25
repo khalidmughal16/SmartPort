@@ -7,6 +7,7 @@ import { Features } from './Features'
 import { How } from './How'
 import { Nav } from './Nav'
 import { PortHero } from './PortHero'
+import { Reel } from './Reel'
 import { Preview } from './Preview'
 import { Roles } from './Roles'
 
@@ -52,6 +53,7 @@ export function Home() {
       <Features />
       <How />
       <Preview />
+      <Reel />
       <Roles />
       <section className="sec" id="faq">
         <h2>Questions, <em>answered</em>.</h2>

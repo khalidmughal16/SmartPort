@@ -7,7 +7,7 @@ import { actions, toast } from '../lib/store'
 import loginImg from '../assets/login.jpg'
 import signupImg from '../assets/signup.jpg'
 
-export function Auth({ signup }: { signup: boolean }) {
+export function Auth({ signup, as }: { signup: boolean; as?: string }) {
   const router = useRouter()
   const [f, setF] = useState({ n: '', e: '', p: '', p2: '', r: 'C' as Role, invite: '', co: '' })
   const [show, setShow] = useState(false)
@@ -38,6 +38,7 @@ export function Auth({ signup }: { signup: boolean }) {
       <div className="sp-form">
         <Link className="sp-back" href="/app/">&larr; Back to home</Link>
         <div className="auth">
+          {as && !signup && <p className="as-badge">Signing in to <b>{as}</b></p>}
           <h2>{signup ? <>Create your <em>account</em></> : <>Welcome <em>back</em></>}</h2>
           <p className="sub">{signup ? 'Create a client account to track your containers.' : 'Sign in to your SmartPort terminal.'}</p>
           <form id="af" className={signup ? 'su' : ''} noValidate onKeyDown={onKey} onSubmit={(e) => e.preventDefault()}>

@@ -48,9 +48,7 @@ export function Film() {
     const $$ = (s: string) => [...el.querySelectorAll(s)] as any[]
     const by = (id: string) => document.getElementById(id) as any
     const imgs = $$('#bg img') as HTMLElement[]
-    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
-    let AP = 0, last = -1, visible = true, AT = 0, LF = 0, raf = 0
-    let hold = window.parent !== window // when embedded in the laptop intro, the parent releases it
+    let AP = 0, last = -1, visible = true, LF = 0, raf = 0
 
     /** Updates the floating widget of the current chapter as the chapter progresses (t = 0..1). */
     const widget = (i: number, t: number) => {
@@ -100,27 +98,20 @@ export function Film() {
     const setSlide = (x: number) => { AP = cl(x, 0, 0.9999); last = -1; frame(); pub() }
     film.go = goSlide; film.set = setSlide
 
+    // The slider has ONE clock (film.p). PortHero advances it, and only after the laptop zoom has finished,
+    // so the slider always starts from chapter 1 and this section just follows it.
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick)
-      const dt = Math.min(1000, t - AT || 0); AT = t
-      // keep time running even while the hero laptop is on screen, so the slider never restarts when you zoom in
-      if (hold || document.hidden || reduced) return
-      AP += dt / (SLIDE_MS * 10)
-      if (AP >= 1) AP = 0
-      if (t - LF >= 45) { LF = t; if (visible) frame(); pub() }
-    }
-    const onMsg = (e: MessageEvent) => {
-      if (e.data?.type !== 'sp-hold') return
-      hold = !!e.data.hold
-      if (e.data.restart) { scrollTo(0, 0); setSlide(0.002) }
+      if (document.hidden) return
+      if (Math.abs(AP - film.p) > 1e-6 && t - LF >= 45) { LF = t; AP = film.p; if (visible) frame() }
     }
     const onResize = () => { last = -1; frame() }
     const io = new IntersectionObserver((e) => { visible = e[0].isIntersecting }, { threshold: 0.05 })
     io.observe(el)
-    addEventListener('message', onMsg); addEventListener('resize', onResize)
+    addEventListener('resize', onResize)
     frame()
     raf = requestAnimationFrame(tick)
-    return () => { cancelAnimationFrame(raf); io.disconnect(); removeEventListener('message', onMsg); removeEventListener('resize', onResize); film.go = () => {}; film.set = () => {} }
+    return () => { cancelAnimationFrame(raf); io.disconnect(); removeEventListener('resize', onResize); film.go = () => {}; film.set = () => {} }
   }, [])
 
   const sg = [0, 0, 1, 2, 3, 3, 3, 3, 4, 4][idx]

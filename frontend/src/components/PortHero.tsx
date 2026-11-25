@@ -1,20 +1,10 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { STORY } from '../lib/data'
 import { film } from '../lib/film'
-import film0 from '../assets/film-0.jpg'
-import film1 from '../assets/film-1.jpg'
-import film2 from '../assets/film-2.jpg'
-import film3 from '../assets/film-3.jpg'
-import film4 from '../assets/film-4.jpg'
-import film5 from '../assets/film-5.jpg'
-import film6 from '../assets/film-6.jpg'
-import film7 from '../assets/film-7.jpg'
-import film8 from '../assets/film-8.jpg'
-import film9 from '../assets/film-9.jpg'
+import { SLIDES } from '../lib/reel'
+import { useChapterVideos } from '../lib/useChapterVideos'
 
-const bgs = [film0, film1, film2, film3, film4, film5, film6, film7, film8, film9].map((m) => m.src)
 
 /**
  * Landing hero. Light mode shows the daytime port photo, dark mode the night one
@@ -24,8 +14,8 @@ const bgs = [film0, film1, film2, film3, film4, film5, film6, film7, film8, film
  * zoom the page simply carries on inside it (the <Film/> section right below).
  */
 
-// Closed laptop footprint inside each 1672x941 photo: centre x/y and width (px)
-const LAP = { light: { cx: 775, cy: 727, w: 866 }, dark: { cx: 777, cy: 750, w: 805 } }
+// Open laptop footprint inside the 1672x941 background (same spot in light and dark): centre x, y and lid width (px)
+const LAP = { cx: 838, cy: 817, w: 1059 }
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
@@ -56,64 +46,67 @@ function Cube({ size }: { size: string }) {
  * The laptop screen runs the SAME slider as <Film/>: it reads film.p (the shared progress), so the photo,
  * chapter text and journey pill change on the laptop exactly as they do below. Nothing is a frozen picture.
  */
-const SG = [0, 0, 1, 2, 3, 3, 3, 3, 4, 4]
+const N = SLIDES.length
 function ScreenPage({ live }: { live: boolean }) {
-  const [light, setLight] = useState(false)
-  const [lightOk, setLightOk] = useState<boolean[]>(() => bgs.map(() => false))
-  const [idx, setIdx] = useState(() => Math.min(9, Math.floor(film.p * 10)))
+  const [idx, setIdx] = useState(() => Math.min(N - 1, Math.floor(film.p * N)))
   const root = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const de = document.documentElement
-    const read = () => setLight(de.getAttribute('data-theme') === 'light')
-    read()
-    const mo = new MutationObserver(read)
-    mo.observe(de, { attributes: true, attributeFilter: ['data-theme'] })
-    bgs.forEach((_, i) => {
-      const im = new Image()
-      im.onload = () => setLightOk((a) => a.map((v, j) => (j === i ? true : v)))
-      im.src = `/film-light/${i}.jpg`
-    })
-    return () => mo.disconnect()
-  }, [])
   useEffect(() => {
     const el = root.current
     if (!el) return
+    const vid = (i: number) => el.querySelector<HTMLVideoElement>(`video[data-ch="${i}"]`)
     const sync = () => {
-      const p = Math.min(0.9999, Math.max(0, film.p)), i = Math.min(9, Math.floor(p * 10)), t = p * 10 - i
+      const p = Math.min(0.9999, Math.max(0, film.p)), i = Math.min(N - 1, Math.floor(p * N)), t = p * N - i
       setIdx((o) => (o === i ? o : i))
-      const im = el.querySelectorAll<HTMLElement>('.ph-pbgw img')[i]
-      if (im) im.style.transform = `scale(${1.03 + 0.07 * t}) translateX(${(t - 0.5) * -1.6}%)`
       const st = el.querySelector('.ph-gst'), mv = el.querySelector('.ph-gmv')
-      if (st) st.textContent = i === 3 ? (t < 0.5 ? 'Customs hold' : 'Cleared') : STORY[i][3]
-      if (mv) mv.textContent = String(i === 4 ? Math.round(7 * t) : i === 5 ? Math.round(7 * (1 - Math.min(1, t * 2))) : 0)
+      // slide 5 is gate -> customs -> release in one clip, so its status follows the clip
+      if (st) st.textContent = SLIDES[i].src.endsWith('/s4.mp4') ? (t < 0.35 ? 'At gate' : t < 0.7 ? 'Customs' : 'Released') : SLIDES[i].s[3]
+      if (mv) mv.textContent = SLIDES[i].s[5]
     }
     sync()
     film.subs.add(sync)
-    // the slider's clock lives here now: it only advances once the laptop is fully zoomed in (film.run)
-    const SLIDE_MS = 3000
-    let raf = 0, at = 0
-    const tick = (t: number) => {
+    // The slider has its own clock, locked to the playing clip: while a clip plays, progress = its playhead; if a clip
+    // is slow to start or stuck, the clock keeps going after a short grace period, so the slider can never freeze on one video.
+    // The next slide starts when the clip has ended (or its length has elapsed), and the last slide wraps to the first.
+    let raf = 0, cur = -1, spent = 0, stuck = 0, lastPlay = 0, last = performance.now(), vis = true
+    const io = new IntersectionObserver((e) => { vis = e[0].isIntersecting }, { threshold: 0.05 })
+    io.observe(el)
+    const advance = (i: number) => {
+      const n = (i + 1) % N, nx = vid(n)
+      if (nx) { nx.currentTime = 0; nx.play().catch(() => {}) }
+      cur = n; spent = 0; stuck = 0
+      film.p = (n + 0.001) / N; sync()
+    }
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick)
-      const dt = Math.min(1000, t - at || 0); at = t
-      if (!film.run || document.hidden) return
-      film.p += dt / (SLIDE_MS * 10)
-      if (film.p >= 1) film.p = 0
-      sync()
+      const dt = Math.min(0.25, (now - last) / 1000); last = now
+      if (!film.run || document.hidden || !vis) return
+      const i = Math.min(N - 1, Math.floor(Math.min(0.9999, Math.max(0, film.p)) * N))
+      const v = vid(i)
+      const dur = v && isFinite(v.duration) && v.duration > 0 ? v.duration : 8
+      if (cur !== i) { cur = i; spent = (Math.min(0.9999, Math.max(0, film.p)) * N - i) * dur; stuck = 0 }
+      if (v && !v.paused && !v.ended && v.readyState >= 3 && v.currentTime > 0) { stuck = 0; spent = v.currentTime }
+      else {
+        stuck += dt
+        if (stuck > 4) spent += dt // clip is not moving: let the clock run so the slider still advances
+        if (v && !v.ended && now - lastPlay > 800) { lastPlay = now; v.play().catch(() => {}) }
+      }
+      if ((v && v.ended) || spent >= dur - 0.05) { advance(i); return }
+      film.p = (i + Math.min(0.999, spent / dur)) / N; sync()
     }
     if (!matchMedia('(prefers-reduced-motion:reduce)').matches) raf = requestAnimationFrame(tick)
-    film.go = (i: number) => { film.p = (i + 0.02) / 10; sync() }
-    film.set = (x: number) => { film.p = Math.min(0.9999, Math.max(0, x)); sync() }
-    return () => { cancelAnimationFrame(raf); film.subs.delete(sync); film.go = () => {}; film.set = () => {} }
+    film.go = (i: number) => { film.p = (i + 0.001) / N; cur = -1; sync() }
+    film.set = (x: number) => { film.p = Math.min(0.9999, Math.max(0, x)); cur = -1; sync() }
+    return () => { cancelAnimationFrame(raf); io.disconnect(); film.subs.delete(sync); film.go = () => {}; film.set = () => {} }
   }, [])
+  useChapterVideos(root, idx)
   const ti = live ? 0 : -1
-  const s = STORY[idx], sg = SG[idx]
+  const s = SLIDES[idx].s, sg = SLIDES[idx].stage, clean = !!SLIDES[idx].clean
   return (
     <div className="ph-pg" aria-hidden={!live} ref={root}>
       <div className="ph-pbgw">
-        {bgs.map((src, i) => {
-          const lt = light && lightOk[i]
-          return <img key={i} alt="" draggable={false} src={lt ? `/film-light/${i}.jpg` : src} className={(i === idx ? 'on' : '') + (light && !lt ? ' fb' : '')} />
-        })}
+        {SLIDES.map((sl, i) => (
+          <video key={sl.src} data-ch={i} className={i === idx ? 'on' : ''} src={sl.src} poster={sl.poster} muted playsInline preload={i === idx || i === (idx + 1) % N ? 'auto' : 'metadata'} aria-hidden="true" />
+        ))}
       </div>
       <div className="ph-pshade" />
       <div className="ph-pnav">
@@ -124,9 +117,9 @@ function ScreenPage({ live }: { live: boolean }) {
           <span className="ph-pbtn">Sign in</span><span className="ph-pbtn">Sign up</span><span className="ph-pbtn p">Enter Terminal</span>
         </span>
       </div>
-      <ol className="ph-pjr">
+      {!clean && <ol className="ph-pjr">
         {['Vessel', 'Gate-in', 'Customs', 'Yard', 'Released'].map((n, i) => <li key={n} className={i === sg ? 'n' : ''}>{n}</li>)}
-      </ol>
+      </ol>}
       {idx === 0 && <div className="ph-pbd"><i />Berth B-3 &middot; vessel arriving</div>}
       {idx === 0 && (
         <div className="ph-ptr">
@@ -139,21 +132,57 @@ function ScreenPage({ live }: { live: boolean }) {
           <div className="ph-ptrk"><b>MV Karachi Star</b><span>ETA <b>13</b> min</span><span>Berth <b>B-3</b></span><span>Tugs <b>2</b></span></div>
         </div>
       )}
-      <div className="ph-pch" key={idx}>
-        <p className="ph-pk">{String(idx + 1).padStart(2, '0')} / 10</p>
+      {!clean && <div className="ph-pch" key={idx}>
+        <p className="ph-pk">{String(idx + 1).padStart(2, '0')} / {String(N).padStart(2, '0')}</p>
         <h2 className="ph-phd">{s[0]}<br /><em>{s[1]}</em></h2>
         <p className="ph-pa">
           <Link className="ph-pb p" href="/app/login" tabIndex={ti}>Enter Terminal</Link>
           {idx === 0 && <button type="button" className="ph-pb" tabIndex={ti} onClick={() => film.go(1)}>Follow the journey</button>}
         </p>
-      </div>
-      <div className="ph-pgm">
+      </div>}
+      {!clean && <div className="ph-pgm">
         <b>GMT-0042 <span>demo</span></b>
         <div><span>Status</span><span className="ph-gst">{s[3]}</span></div>
         <div><span>Location</span><span>{s[4]}</span></div>
         <div><span>Extra moves</span><span className="ph-gmv">0</span></div>
         <div><span>Dwell days</span><span>{s[6]}</span></div>
-      </div>
+      </div>}
+    </div>
+  )
+}
+
+
+/**
+ * What the laptop screen shows while it opens and zooms (until we are "inside" the screen): a branded wallpaper.
+ * Dark mode uses the green-wave wallpaper (public/hero/wall-dark.jpg); light mode a matching light wallpaper (SVG, crisp at any size).
+ * Its opacity is driven by --z in CSS and reaches 0 just before the slider takes over.
+ */
+function Wall() {
+  return (
+    <div className="ph-wall" aria-hidden="true">
+      <img className="wd" src="/hero/wall-dark.jpg" alt="" draggable={false} />
+      <svg className="wl" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" focusable="false">
+        <defs>
+          <linearGradient id="wl-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#F9FBFE" /><stop offset="1" stopColor="#E4EEF9" /></linearGradient>
+          <linearGradient id="wl-g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#B4F02B" stopOpacity=".95" /><stop offset="1" stopColor="#3F8A00" stopOpacity=".75" /></linearGradient>
+          <linearGradient id="wl-g2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stopColor="#3F8A00" stopOpacity=".8" /><stop offset="1" stopColor="#B4F02B" stopOpacity=".95" /></linearGradient>
+          <filter id="wl-glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="14" /></filter>
+        </defs>
+        <rect width="1600" height="900" fill="url(#wl-bg)" />
+        <g fill="none" strokeLinecap="round">
+          <path d="M-40 70 C 260 -10, 560 40, 700 -30" stroke="url(#wl-g1)" strokeWidth="46" opacity=".35" filter="url(#wl-glow)" />
+          <path d="M-40 70 C 260 -10, 560 40, 700 -30" stroke="url(#wl-g1)" strokeWidth="5" />
+          <path d="M-40 140 C 220 40, 420 140, 640 -10" stroke="url(#wl-g1)" strokeWidth="3" opacity=".7" />
+          <path d="M-40 230 C 150 150, 300 160, 420 40" stroke="url(#wl-g1)" strokeWidth="2" opacity=".5" />
+          <path d="M-60 820 C 300 700, 640 820, 960 770 S 1420 560, 1680 600" stroke="url(#wl-g2)" strokeWidth="50" opacity=".32" filter="url(#wl-glow)" />
+          <path d="M-60 820 C 300 700, 640 820, 960 770 S 1420 560, 1680 600" stroke="url(#wl-g2)" strokeWidth="6" />
+          <path d="M-60 860 C 340 760, 700 880, 1000 820 S 1440 640, 1680 690" stroke="url(#wl-g2)" strokeWidth="3" opacity=".7" />
+          <path d="M-60 900 C 400 820, 760 930, 1060 870 S 1480 730, 1680 780" stroke="url(#wl-g2)" strokeWidth="2" opacity=".5" />
+        </g>
+        <text x="800" y="500" textAnchor="middle" fontFamily="'Inter Tight','Inter',system-ui,sans-serif" fontWeight="700" fontSize="168" letterSpacing="-4">
+          <tspan fill="#0B1B3A">Smart</tspan><tspan fill="#4E9A00">port</tspan>
+        </text>
+      </svg>
     </div>
   )
 }
@@ -174,14 +203,14 @@ export function PortHero() {
     const layout = () => {
       const vw = innerWidth, vh = innerHeight
       const s = Math.max(vw / 1672, vh / 941) // object-fit: cover scale
-      const L = document.documentElement.dataset.theme === 'light' ? LAP.light : LAP.dark
+      const L = LAP
       const w = (L.w * s * 0.96) / 1.03
       el.style.setProperty('--w', w.toFixed(1) + 'px')
       el.style.setProperty('--lx', ((vw - 1672 * s) / 2 + L.cx * s).toFixed(1) + 'px')
       el.style.setProperty('--ly', ((vh - 941 * s) / 2 + L.cy * s - w * 0.07).toFixed(1) + 'px')
       el.style.setProperty('--dx', (vw / 2 - ((vw - 1672 * s) / 2 + L.cx * s)).toFixed(1) + 'px')
       el.style.setProperty('--dy', (vh / 2 - ((vh - 941 * s) / 2 + L.cy * s - w * 0.07)).toFixed(1) + 'px')
-      el.style.setProperty('--se', Math.max(vw / (w * 0.976), vh / (w * 0.549)).toFixed(3)) // inner screen covers the viewport
+      el.style.setProperty('--se', Math.max(vw / (w * 0.966), vh / (w * 0.5434)).toFixed(3)) // inner screen covers the viewport
     }
     const tick = () => {
       raf = 0
@@ -189,14 +218,22 @@ export function PortHero() {
       if (rm) return
       const span = el.offsetHeight - innerHeight
       const p = span <= 0 ? 0 : clamp(-el.getBoundingClientRect().top / span)
-      const c = clamp(p / 0.06)
-      const o = ease(clamp((p - 0.04) / 0.4))
-      const z = ease(clamp((p - 0.46) / 0.4))
+      const c = clamp(p / 0.06) // fades the "Scroll to explore" hint
+      const o = ease(clamp((p - 0.04) / 0.4)) // lid opens first ...
+      const z = ease(clamp((p - 0.46) / 0.4)) // ... then we zoom into the screen
       el.style.setProperty('--c', c.toFixed(3))
       el.style.setProperty('--o', o.toFixed(4))
       el.style.setProperty('--z', z.toFixed(4))
       setOpen(o > 0.85)
+      const was = film.run
       film.run = z > 0.98 // slider starts only once we are inside the laptop
+      if (film.run && !was) dispatchEvent(new Event('sp-run')) // restart chapter 1's clip exactly when the slider starts
+      // fully zoomed: drop the 3D scaling and show the screen as a plain full-size page (crisp text, no blur)
+      const done = el.classList.contains('ph-done')
+      if (!done && z > 0.995) el.classList.add('ph-done')
+      else if (done && z < 0.985) el.classList.remove('ph-done')
+      // laptop closed again (scrolled back to the top): next time the slider starts from chapter 1 again
+      if (z < 0.02 && film.p > 0.0021) { film.p = 0.002; film.subs.forEach((f) => f()) }
     }
     const req = () => { if (!raf) raf = requestAnimationFrame(tick) }
     addEventListener('scroll', req, { passive: true })
@@ -230,6 +267,7 @@ export function PortHero() {
                 <i className="ph-cam" />
                 <div className="ph-in">
                   <ScreenPage live={open} />
+                  <Wall />
                 </div>
                 <div className="ph-gl" />
               </div>

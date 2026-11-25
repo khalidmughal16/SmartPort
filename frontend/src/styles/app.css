@@ -730,3 +730,98 @@ html:root[data-theme=light] .lcm .lci:hover::before{background:#3F8A00;box-shado
 /* v5.6: module names — no white box behind them (that came from my own chip background) */
 html:root[data-theme=light] .lci,html:root[data-theme=light] .lcm .lci{background:transparent;border:0;box-shadow:none}
 /* v5.6 end */
+
+/* ===== v6: laptop zoom end-state is a flat, full-size page (3D scale made text/cards blurry) ===== */
+.ph.ph-done .ph-scene{perspective:none}
+.ph.ph-done .ph-rig{left:0;top:0;width:100%;height:100%;transform:none;transform-style:flat}
+.ph.ph-done .ph-lid{left:0;top:0;width:100%;height:100%;transform:none;transform-style:flat}
+.ph.ph-done .ph-scr{padding:0;border-radius:0;box-shadow:none;background:transparent}
+.ph.ph-done .ph-in{position:absolute;top:0;bottom:0;left:50%;margin-left:calc(max(100%,100svh*1.7778)/-2);border-radius:0;width:max(100%,calc(100svh*1.7778));height:100%}
+.ph.ph-done .ph-sh,.ph.ph-done .ph-base,.ph.ph-done .ph-edge,.ph.ph-done .ph-gl,.ph.ph-done .ph-cam,.ph.ph-done .ph-cov{display:none}
+/* v6 end */
+
+/* ===== v7: story videos ===== */
+/* laptop slider: chapter clips sit above the photo, below the shade/text */
+.ph-pbgw video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .45s ease;pointer-events:none}
+.ph-pbgw video.on{opacity:1}
+:root[data-theme=light] .ph-pbgw video{filter:brightness(1.12) saturate(1.1)}
+
+/* "In motion" section */
+.rl2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;margin-top:28px}
+.rv{margin:0;position:relative;border-radius:20px;overflow:hidden;aspect-ratio:16/10;background:#0A1526;border:1px solid var(--ln);box-shadow:0 20px 44px -24px rgba(11,27,58,.45)}
+.rv video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform 1.2s ease}
+.rv:hover video{transform:scale(1.04)}
+.rv figcaption{position:absolute;left:0;right:0;bottom:0;padding:54px 24px 22px;color:#fff;display:flex;flex-direction:column;gap:4px;background:linear-gradient(180deg,transparent,rgba(6,13,24,.88))}
+.rv figcaption b{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#C6F135;font-weight:600}
+.rv figcaption span{font:600 clamp(20px,2.1vw,28px)/1.15 'Fraunces',Georgia,serif}
+.rv figcaption small{font-size:14px;opacity:.82;max-width:46ch}
+@media(max-width:800px){.rl2{grid-template-columns:1fr}}
+
+/* CTA band: night-port video sits behind the text */
+.sec.cta{position:relative;overflow:hidden}
+.sec.cta>*{position:relative;z-index:1}
+.sec.cta>.cta-v{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:.5;pointer-events:none}
+html:root[data-theme=light] .sec.cta>.cta-v{opacity:.22;mix-blend-mode:multiply}
+@media(prefers-reduced-motion:reduce){.cta-v{display:none}}
+/* v7 end */
+
+/* ===== v8: slider = 8 full videos, no photos. Box matches the 16:9 page so the video is not over-zoomed (was the blur) ===== */
+.ph-in .ph-pbgw{height:calc(var(--u)*810);top:0;transform:none}
+.ph-in .ph-pbgw video{filter:none!important;image-rendering:auto;transform:none;will-change:auto;background:#0A1526}
+:root[data-theme=light] .ph-in .ph-pbgw video{filter:none!important}
+.ph-in .ph-pbgw video{transition:opacity .5s ease}
+.sec.cta>.cta-v{display:none}
+/* v8 end */
+
+/* ===== v9: laptop wallpaper until we are inside the screen (dark: green waves, light: matching light one) ===== */
+.ph-wall{position:absolute;inset:0;z-index:20;pointer-events:none;background:#000;opacity:clamp(0,calc((.97 - var(--z)) / .14),1)}
+.ph-wall img,.ph-wall svg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.ph-wall .wl{display:none}
+:root[data-theme=light] .ph-wall{background:#EEF4FB}
+:root[data-theme=light] .ph-wall .wd{display:none}
+:root[data-theme=light] .ph-wall .wl{display:block}
+.ph.ph-done .ph-wall{display:none}
+/* v9 end */
+
+/* ===== Hero v4: open silver laptop on the desk photo (same design in light + dark) ===== */
+.ph-stage{background:#030703}
+:root[data-theme=light] .ph-stage{background:#EAF3EA}
+.ph-veil{display:none}
+.ph-scene{opacity:1}
+/* the headline stays in the page for screen readers / SEO, the picture itself carries the hero */
+.ph-txt{left:0;right:auto;top:0;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.ph-rig{transform:translate(calc(var(--o)*var(--dx)),calc(var(--z)*(var(--dy) + var(--h)*.5*var(--S)))) scale(var(--S)) rotateX(calc(var(--z)*5.5deg - 5.5deg - (1 - var(--o))*4.5deg))}
+.ph-scene{perspective-origin:50% 82%}
+/* screen: thin black bezel inside a silver aluminium frame, 16:9 glass */
+.ph-scr{padding:calc(var(--w)*.04) calc(var(--w)*.017) calc(var(--w)*.042);background:#0a0b0c;border-radius:calc(var(--w)*.014);box-shadow:0 0 0 calc(var(--w)*.0035) #b9bdc4,0 0 0 calc(var(--w)*.0055) #7c8189}
+.ph-cov{background:linear-gradient(135deg,#d7dade,#9aa0a8);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
+:root:not([data-theme=light]) .ph-cov{background:linear-gradient(135deg,#d7dade,#9aa0a8)}
+.ph-cam{top:calc(var(--w)*.018);width:calc(var(--w)*.0055);height:calc(var(--w)*.0055);margin-left:calc(var(--w)*-.00275);background:#1b1e24;box-shadow:0 0 0 calc(var(--w)*.0012) #2a2e35}
+/* base: silver deck, black keyboard, silver trackpad */
+.ph-base,:root:not([data-theme=light]) .ph-base{background:linear-gradient(#cfd2d7,#a4a9b0);border-radius:calc(var(--w)*.006) calc(var(--w)*.006) calc(var(--w)*.03) calc(var(--w)*.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),inset 0 calc(var(--w)*.004) calc(var(--w)*.01) rgba(255,255,255,.35)}
+.ph-key{left:3.5%;right:3.5%;top:5%;height:52%;border-radius:calc(var(--w)*.006);background:repeating-linear-gradient(90deg,transparent 0 calc(var(--w)*.0172),#0a0b0c calc(var(--w)*.0172) calc(var(--w)*.0188)),repeating-linear-gradient(0deg,transparent 0 calc(var(--w)*.0172),#0a0b0c calc(var(--w)*.0172) calc(var(--w)*.0188)),#202226;box-shadow:inset 0 0 0 calc(var(--w)*.004) #08090a,0 0 0 1px rgba(255,255,255,.25)}
+.ph-pad{left:34%;right:34%;top:66%;height:26%;background:linear-gradient(#bfc3c9,#aeb3ba);border-radius:calc(var(--w)*.008);box-shadow:inset 0 0 0 1px rgba(40,46,56,.35)}
+.ph-edge{background:linear-gradient(#b9bdc4,#868b94)}
+.ph-edge::after{content:"";position:absolute;left:44%;right:44%;top:0;height:62%;border-radius:0 0 calc(var(--w)*.01) calc(var(--w)*.01);background:linear-gradient(#5d626b,#8e939b)}
+.ph-sh{background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,.6),rgba(0,0,0,0) 68%)}
+:root[data-theme=light] .ph-sh{background:radial-gradient(ellipse at 50% 46%,rgba(20,45,20,.34),rgba(20,45,20,0) 68%)}
+.ph-gl{background:linear-gradient(115deg,rgba(255,255,255,.1),rgba(255,255,255,0) 34%)}
+/* hinge: while the lid comes upright during the zoom, a bezel-coloured band rises from the deck so no gap shows */
+.ph-rig::before{content:"";position:absolute;left:calc(var(--w)*-.5);width:var(--w);top:calc(var(--w)*-.075*var(--z));height:calc(var(--w)*.075*var(--z) + 1px);background:#0a0b0c;transform:translateZ(1px)}
+.ph-hint{bottom:calc(1svh + env(safe-area-inset-bottom,0px))}
+
+/* smaller vessel tracker card */
+.ph-ptr{width:calc(var(--u)*270);padding:calc(var(--u)*12) calc(var(--u)*16);border-radius:calc(var(--u)*18);top:calc(var(--u)*(190 + 40*var(--z)))}
+.ph-ptrh{font-size:calc(var(--u)*13)}.ph-ptrh em{font-size:calc(var(--u)*11)}
+.ph-ptr svg{width:calc(var(--u)*150);height:calc(var(--u)*150);margin:calc(var(--u)*6) auto}
+.ph-ptrk{gap:calc(var(--u)*10);font-size:calc(var(--u)*11);flex-wrap:wrap}
+
+.rv-link{position:absolute;inset:0;z-index:2;border-radius:inherit}
+.rv-link:focus-visible{outline:2px solid #C6F135;outline-offset:-4px}
+.rv{cursor:pointer}
+.rv figcaption{pointer-events:none}
+.rv-cta{font-style:normal;margin-top:8px;font-size:13px;font-weight:600;color:#C6F135;opacity:0;transform:translateY(4px);transition:opacity .25s,transform .25s}
+.rv:hover .rv-cta,.rv-link:focus-visible~figcaption .rv-cta{opacity:1;transform:none}
+@media(hover:none){.rv-cta{opacity:1;transform:none}}
+.as-badge{display:inline-block;margin:0 0 12px;padding:5px 12px;border-radius:99px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;background:rgba(198,241,53,.14);color:var(--fg);border:1px solid rgba(198,241,53,.45)}
+.as-badge b{font-weight:700}
