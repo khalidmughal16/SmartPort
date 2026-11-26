@@ -14,8 +14,8 @@ import { useChapterVideos } from '../lib/useChapterVideos'
  * zoom the page simply carries on inside it (the <Film/> section right below).
  */
 
-// Open laptop footprint inside the 1672x941 background (same spot in light and dark): centre x, y and lid width (px)
-const LAP = { cx: 838, cy: 817, w: 1059 }
+// Closed laptop footprint inside each 1672x941 photo: centre x/y and width (px)
+const LAP = { light: { cx: 813, cy: 696, w: 901 }, dark: { cx: 815, cy: 733, w: 862 } }
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
@@ -59,48 +59,42 @@ function ScreenPage({ live }: { live: boolean }) {
       setIdx((o) => (o === i ? o : i))
       const st = el.querySelector('.ph-gst'), mv = el.querySelector('.ph-gmv')
       // slide 5 is gate -> customs -> release in one clip, so its status follows the clip
-      if (st) st.textContent = SLIDES[i].src.endsWith('/s4.mp4') ? (t < 0.35 ? 'At gate' : t < 0.7 ? 'Customs' : 'Released') : SLIDES[i].s[3]
+      if (st) st.textContent = i === 4 ? (t < 0.35 ? 'At gate' : t < 0.7 ? 'Customs' : 'Released') : SLIDES[i].s[3]
       if (mv) mv.textContent = SLIDES[i].s[5]
     }
     sync()
     film.subs.add(sync)
-    // The slider has its own clock, locked to the playing clip: while a clip plays, progress = its playhead; if a clip
-    // is slow to start or stuck, the clock keeps going after a short grace period, so the slider can never freeze on one video.
-    // The next slide starts when the clip has ended (or its length has elapsed), and the last slide wraps to the first.
-    let raf = 0, cur = -1, spent = 0, stuck = 0, lastPlay = 0, last = performance.now(), vis = true
-    const io = new IntersectionObserver((e) => { vis = e[0].isIntersecting }, { threshold: 0.05 })
-    io.observe(el)
+    // The slider is driven by the VIDEO itself: progress = playhead of the current clip, and the next slide
+    // starts only when the clip has played to its end, so every video plays in full (~8 s each).
+    let raf = 0, cur = -1, t0 = 0, kick = 0
     const advance = (i: number) => {
-      const n = (i + 1) % N, nx = vid(n)
-      if (nx) { nx.currentTime = 0; nx.play().catch(() => {}) }
-      cur = n; spent = 0; stuck = 0
-      film.p = (n + 0.001) / N; sync()
+      const nx = vid((i + 1) % N); if (nx) nx.currentTime = 0 // a clip that already played once must not look 'ended' again
+      film.p = (((i + 1) % N) + 0.001) / N; sync()
     }
-    const tick = (now: number) => {
+    const onRun = () => { t0 = performance.now() }
+    addEventListener('sp-run', onRun)
+    const tick = () => {
       raf = requestAnimationFrame(tick)
-      const dt = Math.min(0.25, (now - last) / 1000); last = now
-      if (!film.run || document.hidden || !vis) return
+      const now = performance.now()
+      if (!film.run || document.hidden || !film.vis) { t0 = now; return } // paused: off screen, hidden tab or laptop not zoomed yet
       const i = Math.min(N - 1, Math.floor(Math.min(0.9999, Math.max(0, film.p)) * N))
+      if (i !== cur) { cur = i; t0 = now }
       const v = vid(i)
       const dur = v && isFinite(v.duration) && v.duration > 0 ? v.duration : 8
-      if (cur !== i) { cur = i; spent = (Math.min(0.9999, Math.max(0, film.p)) * N - i) * dur; stuck = 0 }
-      if (v && !v.paused && !v.ended && v.readyState >= 3 && v.currentTime > 0) { stuck = 0; spent = v.currentTime }
-      else {
-        stuck += dt
-        if (stuck > 4) spent += dt // clip is not moving: let the clock run so the slider still advances
-        if (v && !v.ended && now - lastPlay > 800) { lastPlay = now; v.play().catch(() => {}) }
-      }
-      if ((v && v.ended) || spent >= dur - 0.05) { advance(i); return }
-      film.p = (i + Math.min(0.999, spent / dur)) / N; sync()
+      const ended = !!v && (v.ended || (isFinite(v.duration) && v.currentTime >= v.duration - 0.04))
+      // watchdog: never wait on a clip longer than its length + 1.2 s (a stuck/failed clip must not freeze the slider)
+      if (ended || now - t0 > (dur + 1.2) * 1000) { advance(i); return }
+      if (v && v.paused && now - kick > 600) { kick = now; v.play().catch(() => {}) } // nudge a clip that did not start
+      if (v && !v.paused && v.readyState >= 2) { film.p = (i + Math.min(0.999, v.currentTime / dur)) / N; sync() }
     }
     if (!matchMedia('(prefers-reduced-motion:reduce)').matches) raf = requestAnimationFrame(tick)
-    film.go = (i: number) => { film.p = (i + 0.001) / N; cur = -1; sync() }
-    film.set = (x: number) => { film.p = Math.min(0.9999, Math.max(0, x)); cur = -1; sync() }
-    return () => { cancelAnimationFrame(raf); io.disconnect(); film.subs.delete(sync); film.go = () => {}; film.set = () => {} }
+    film.go = (i: number) => { film.p = (i + 0.001) / N; sync() }
+    film.set = (x: number) => { film.p = Math.min(0.9999, Math.max(0, x)); sync() }
+    return () => { cancelAnimationFrame(raf); removeEventListener('sp-run', onRun); film.subs.delete(sync); film.go = () => {}; film.set = () => {} }
   }, [])
   useChapterVideos(root, idx)
   const ti = live ? 0 : -1
-  const s = SLIDES[idx].s, sg = SLIDES[idx].stage, clean = !!SLIDES[idx].clean
+  const s = SLIDES[idx].s, sg = SLIDES[idx].stage
   return (
     <div className="ph-pg" aria-hidden={!live} ref={root}>
       <div className="ph-pbgw">
@@ -117,9 +111,9 @@ function ScreenPage({ live }: { live: boolean }) {
           <span className="ph-pbtn">Sign in</span><span className="ph-pbtn">Sign up</span><span className="ph-pbtn p">Enter Terminal</span>
         </span>
       </div>
-      {!clean && <ol className="ph-pjr">
+      <ol className="ph-pjr">
         {['Vessel', 'Gate-in', 'Customs', 'Yard', 'Released'].map((n, i) => <li key={n} className={i === sg ? 'n' : ''}>{n}</li>)}
-      </ol>}
+      </ol>
       {idx === 0 && <div className="ph-pbd"><i />Berth B-3 &middot; vessel arriving</div>}
       {idx === 0 && (
         <div className="ph-ptr">
@@ -132,21 +126,21 @@ function ScreenPage({ live }: { live: boolean }) {
           <div className="ph-ptrk"><b>MV Karachi Star</b><span>ETA <b>13</b> min</span><span>Berth <b>B-3</b></span><span>Tugs <b>2</b></span></div>
         </div>
       )}
-      {!clean && <div className="ph-pch" key={idx}>
+      <div className="ph-pch" key={idx}>
         <p className="ph-pk">{String(idx + 1).padStart(2, '0')} / {String(N).padStart(2, '0')}</p>
         <h2 className="ph-phd">{s[0]}<br /><em>{s[1]}</em></h2>
         <p className="ph-pa">
           <Link className="ph-pb p" href="/app/login" tabIndex={ti}>Enter Terminal</Link>
           {idx === 0 && <button type="button" className="ph-pb" tabIndex={ti} onClick={() => film.go(1)}>Follow the journey</button>}
         </p>
-      </div>}
-      {!clean && <div className="ph-pgm">
+      </div>
+      <div className="ph-pgm">
         <b>GMT-0042 <span>demo</span></b>
         <div><span>Status</span><span className="ph-gst">{s[3]}</span></div>
         <div><span>Location</span><span>{s[4]}</span></div>
         <div><span>Extra moves</span><span className="ph-gmv">0</span></div>
         <div><span>Dwell days</span><span>{s[6]}</span></div>
-      </div>}
+      </div>
     </div>
   )
 }
@@ -203,14 +197,14 @@ export function PortHero() {
     const layout = () => {
       const vw = innerWidth, vh = innerHeight
       const s = Math.max(vw / 1672, vh / 941) // object-fit: cover scale
-      const L = LAP
+      const L = document.documentElement.dataset.theme === 'light' ? LAP.light : LAP.dark
       const w = (L.w * s * 0.96) / 1.03
       el.style.setProperty('--w', w.toFixed(1) + 'px')
       el.style.setProperty('--lx', ((vw - 1672 * s) / 2 + L.cx * s).toFixed(1) + 'px')
       el.style.setProperty('--ly', ((vh - 941 * s) / 2 + L.cy * s - w * 0.07).toFixed(1) + 'px')
       el.style.setProperty('--dx', (vw / 2 - ((vw - 1672 * s) / 2 + L.cx * s)).toFixed(1) + 'px')
       el.style.setProperty('--dy', (vh / 2 - ((vh - 941 * s) / 2 + L.cy * s - w * 0.07)).toFixed(1) + 'px')
-      el.style.setProperty('--se', Math.max(vw / (w * 0.966), vh / (w * 0.5434)).toFixed(3)) // inner screen covers the viewport
+      el.style.setProperty('--se', Math.max(vw / (w * 0.976), vh / (w * 0.549)).toFixed(3)) // inner screen covers the viewport
     }
     const tick = () => {
       raf = 0
@@ -218,9 +212,9 @@ export function PortHero() {
       if (rm) return
       const span = el.offsetHeight - innerHeight
       const p = span <= 0 ? 0 : clamp(-el.getBoundingClientRect().top / span)
-      const c = clamp(p / 0.06) // fades the "Scroll to explore" hint
-      const o = ease(clamp((p - 0.04) / 0.4)) // lid opens first ...
-      const z = ease(clamp((p - 0.46) / 0.4)) // ... then we zoom into the screen
+      const c = clamp(p / 0.06)
+      const o = ease(clamp((p - 0.04) / 0.4))
+      const z = ease(clamp((p - 0.46) / 0.4))
       el.style.setProperty('--c', c.toFixed(3))
       el.style.setProperty('--o', o.toFixed(4))
       el.style.setProperty('--z', z.toFixed(4))

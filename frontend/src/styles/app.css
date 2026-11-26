@@ -668,7 +668,7 @@ html:root[data-theme=light] .tile{border-top:4px solid #7FC41A}
 html:root[data-theme=light] .sec h2,html:root[data-theme=light] main h2,html:root[data-theme=light] .big{color:#0B1B3A}
 html:root[data-theme=light] .sec h2 em,html:root[data-theme=light] main h2 em{color:#3F8A00}
 html:root[data-theme=light] .btn.p{background:#B4F02B;color:#0A1A00;border:1px solid #6FA800;box-shadow:0 8px 18px -10px rgba(63,122,0,.7)}
-html:root[data-theme=light] .btn:not(.p){background:#fff;border-color:rgba(11,27,58,.22);color:#0B1B3A}
+html:root[data-theme=light] .btn:not(.p):not(.h){background:#fff;border-color:rgba(11,27,58,.22);color:#0B1B3A}
 html:root[data-theme=light] .sx-yard{border-bottom:2px solid rgba(11,27,58,.3)}
 /* v5-light end */
 
@@ -783,45 +783,7 @@ html:root[data-theme=light] .sec.cta>.cta-v{opacity:.22;mix-blend-mode:multiply}
 .ph.ph-done .ph-wall{display:none}
 /* v9 end */
 
-/* ===== Hero v4: open silver laptop on the desk photo (same design in light + dark) ===== */
-.ph-stage{background:#030703}
-:root[data-theme=light] .ph-stage{background:#EAF3EA}
-.ph-veil{display:none}
-.ph-scene{opacity:1}
-/* the headline stays in the page for screen readers / SEO, the picture itself carries the hero */
-.ph-txt{left:0;right:auto;top:0;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.ph-rig{transform:translate(calc(var(--o)*var(--dx)),calc(var(--z)*(var(--dy) + var(--h)*.5*var(--S)))) scale(var(--S)) rotateX(calc(var(--z)*5.5deg - 5.5deg - (1 - var(--o))*4.5deg))}
-.ph-scene{perspective-origin:50% 82%}
-/* screen: thin black bezel inside a silver aluminium frame, 16:9 glass */
-.ph-scr{padding:calc(var(--w)*.04) calc(var(--w)*.017) calc(var(--w)*.042);background:#0a0b0c;border-radius:calc(var(--w)*.014);box-shadow:0 0 0 calc(var(--w)*.0035) #b9bdc4,0 0 0 calc(var(--w)*.0055) #7c8189}
-.ph-cov{background:linear-gradient(135deg,#d7dade,#9aa0a8);box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
-:root:not([data-theme=light]) .ph-cov{background:linear-gradient(135deg,#d7dade,#9aa0a8)}
-.ph-cam{top:calc(var(--w)*.018);width:calc(var(--w)*.0055);height:calc(var(--w)*.0055);margin-left:calc(var(--w)*-.00275);background:#1b1e24;box-shadow:0 0 0 calc(var(--w)*.0012) #2a2e35}
-/* base: silver deck, black keyboard, silver trackpad */
-.ph-base,:root:not([data-theme=light]) .ph-base{background:linear-gradient(#cfd2d7,#a4a9b0);border-radius:calc(var(--w)*.006) calc(var(--w)*.006) calc(var(--w)*.03) calc(var(--w)*.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),inset 0 calc(var(--w)*.004) calc(var(--w)*.01) rgba(255,255,255,.35)}
-.ph-key{left:3.5%;right:3.5%;top:5%;height:52%;border-radius:calc(var(--w)*.006);background:repeating-linear-gradient(90deg,transparent 0 calc(var(--w)*.0172),#0a0b0c calc(var(--w)*.0172) calc(var(--w)*.0188)),repeating-linear-gradient(0deg,transparent 0 calc(var(--w)*.0172),#0a0b0c calc(var(--w)*.0172) calc(var(--w)*.0188)),#202226;box-shadow:inset 0 0 0 calc(var(--w)*.004) #08090a,0 0 0 1px rgba(255,255,255,.25)}
-.ph-pad{left:34%;right:34%;top:66%;height:26%;background:linear-gradient(#bfc3c9,#aeb3ba);border-radius:calc(var(--w)*.008);box-shadow:inset 0 0 0 1px rgba(40,46,56,.35)}
-.ph-edge{background:linear-gradient(#b9bdc4,#868b94)}
-.ph-edge::after{content:"";position:absolute;left:44%;right:44%;top:0;height:62%;border-radius:0 0 calc(var(--w)*.01) calc(var(--w)*.01);background:linear-gradient(#5d626b,#8e939b)}
-.ph-sh{background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,.6),rgba(0,0,0,0) 68%)}
-:root[data-theme=light] .ph-sh{background:radial-gradient(ellipse at 50% 46%,rgba(20,45,20,.34),rgba(20,45,20,0) 68%)}
-.ph-gl{background:linear-gradient(115deg,rgba(255,255,255,.1),rgba(255,255,255,0) 34%)}
-/* hinge: while the lid comes upright during the zoom, a bezel-coloured band rises from the deck so no gap shows */
-.ph-rig::before{content:"";position:absolute;left:calc(var(--w)*-.5);width:var(--w);top:calc(var(--w)*-.075*var(--z));height:calc(var(--w)*.075*var(--z) + 1px);background:#0a0b0c;transform:translateZ(1px)}
-.ph-hint{bottom:calc(1svh + env(safe-area-inset-bottom,0px))}
-
-/* smaller vessel tracker card */
-.ph-ptr{width:calc(var(--u)*270);padding:calc(var(--u)*12) calc(var(--u)*16);border-radius:calc(var(--u)*18);top:calc(var(--u)*(190 + 40*var(--z)))}
-.ph-ptrh{font-size:calc(var(--u)*13)}.ph-ptrh em{font-size:calc(var(--u)*11)}
-.ph-ptr svg{width:calc(var(--u)*150);height:calc(var(--u)*150);margin:calc(var(--u)*6) auto}
-.ph-ptrk{gap:calc(var(--u)*10);font-size:calc(var(--u)*11);flex-wrap:wrap}
-
-.rv-link{position:absolute;inset:0;z-index:2;border-radius:inherit}
-.rv-link:focus-visible{outline:2px solid #C6F135;outline-offset:-4px}
-.rv{cursor:pointer}
-.rv figcaption{pointer-events:none}
-.rv-cta{font-style:normal;margin-top:8px;font-size:13px;font-weight:600;color:#C6F135;opacity:0;transform:translateY(4px);transition:opacity .25s,transform .25s}
-.rv:hover .rv-cta,.rv-link:focus-visible~figcaption .rv-cta{opacity:1;transform:none}
-@media(hover:none){.rv-cta{opacity:1;transform:none}}
-.as-badge{display:inline-block;margin:0 0 12px;padding:5px 12px;border-radius:99px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;background:rgba(198,241,53,.14);color:var(--fg);border:1px solid rgba(198,241,53,.45)}
-.as-badge b{font-weight:700}
+/* v10: no white patches behind the light-mode nav links (Journey / Client portal) */
+html:root[data-theme=light] nav.top .btn.h,html:root[data-theme=light] nav.top .btn.h:not(:hover){background:transparent;box-shadow:none;border-color:transparent}
+html:root[data-theme=light] nav.top .btn.h:hover{background:rgba(11,27,58,.06)}
+/* v10 end */

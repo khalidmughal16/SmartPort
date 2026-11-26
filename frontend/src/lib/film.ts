@@ -6,5 +6,7 @@ export const film = {
   p: 0,
   /** true only once the laptop zoom has finished; the slider is paused (on chapter 1) until then */
   run: false,
+  /** true while the slider is on screen (set by the video hook) */
+  vis: true,
   subs: new Set<() => void>(),
 }

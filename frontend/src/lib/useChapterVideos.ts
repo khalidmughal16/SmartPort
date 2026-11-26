@@ -22,7 +22,7 @@ export function useChapterVideos(root: RefObject<HTMLElement | null>, idx: numbe
     }
     const onEnded = (e: Event) => { const v = e.target as HTMLVideoElement; if (!film.run && Number(v.dataset.ch) === idx) { v.currentTime = 0; v.play().catch(() => {}) } }
     const run = () => apply(true)
-    const io = new IntersectionObserver((e) => { const sn = e[0].isIntersecting; if (sn !== seen) { seen = sn; apply(false) } }, { threshold: 0.05 })
+    const io = new IntersectionObserver((e) => { const sn = e[0].isIntersecting; film.vis = sn; if (sn !== seen) { seen = sn; apply(false) } }, { threshold: 0.05 })
     io.observe(el)
     vids.forEach((v) => v.addEventListener('ended', onEnded))
     apply(true)
