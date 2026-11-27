@@ -810,57 +810,82 @@ html:root[data-theme=light] nav.top .btn.h:hover{background:rgba(11,27,58,.06)}
 .ph.ph-done .ph-mouse{display:none}
 /* v13 end */
 
-/* ===== v14: hero text stays readable over the busy port photo (both modes) ===== */
-.ph-txt{isolation:isolate}
-.ph-txt::before{content:'';position:absolute;z-index:-1;left:50%;top:-6svh;width:min(1600px,98vw);height:calc(100% + 12svh);transform:translateX(-50%);pointer-events:none;
-  background:radial-gradient(58% 62% at 50% 50%,rgba(2,9,30,.70) 0%,rgba(2,9,30,.46) 52%,rgba(2,9,30,0) 80%)}
-.ph-txt h1{text-shadow:0 2px 22px rgba(0,8,30,.75),0 0 3px rgba(0,8,30,.55)}
-.ph-txt h1 i{font-weight:600}
-.ph-txt h1 em{color:#D4FF3F;text-shadow:0 2px 20px rgba(0,8,30,.8),0 0 3px rgba(0,8,30,.6)}
-.ph-txt p{font-weight:500;color:#fff;text-shadow:0 1px 14px rgba(0,8,30,.85),0 0 2px rgba(0,8,30,.6)}
-/* "Scroll to explore": its own pill, so it is readable even where it crosses the laptop */
-.ph-hint{padding:9px 18px 7px;border-radius:99px;background:rgba(3,10,32,.58);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);bottom:calc(1.6svh + env(safe-area-inset-bottom,0px))}
-
-/* light mode: soft white scrim + navy text with a white halo */
-:root[data-theme=light] .ph-txt::before{background:radial-gradient(58% 62% at 50% 50%,rgba(255,255,255,.80) 0%,rgba(255,255,255,.52) 52%,rgba(255,255,255,0) 80%)}
-:root[data-theme=light] .ph-txt h1{text-shadow:0 1px 18px rgba(255,255,255,.9),0 0 2px rgba(255,255,255,.7)}
-:root[data-theme=light] .ph-txt p{color:#0B1E4F;font-weight:600;text-shadow:0 1px 14px rgba(255,255,255,.95)}
-:root[data-theme=light] .ph-hint{background:rgba(255,255,255,.78);color:#0B1E4F}
-/* v14 end */
-
-
-/* ===== v16: laptop is back on the first screen (the photo already has its own mouse, so the drawn mouse stays off) ===== */
-.ph-scene{opacity:1}
+/* The photo (hero-dark / hero-light) now has its own closed laptop + mouse, so the CSS laptop and mouse
+   stay hidden at rest and only fade in once the visitor starts scrolling (to open and zoom into the screen). */
 .ph-mouse{display:none!important}
+.ph-scene{opacity:min(1,calc(var(--c,1)*25))}
+.ph-base,.ph-edge,.ph-sh{opacity:min(1,calc(var(--o,1)*14))}
 
-/* light mode: headline sits on a frosted glass panel, so crisp navy text reads over the busy photo */
-:root[data-theme=light] .ph-txt::before{
-  left:50%;top:-2.6svh;width:min(1560px,94vw);height:calc(100% + 5.2svh);border-radius:30px;transform:translateX(-50%);
-  background:rgba(255,255,255,.66);backdrop-filter:blur(14px) saturate(1.15);-webkit-backdrop-filter:blur(14px) saturate(1.15);
-  box-shadow:0 24px 60px -30px rgba(11,30,79,.55),inset 0 0 0 1px rgba(255,255,255,.75)}
-:root[data-theme=light] .ph-txt h1,:root[data-theme=light] .ph-txt p{text-shadow:none}
-:root[data-theme=light] .ph-txt h1{color:#0B1E4F}
-/* v16 end */
+/* light mode: bolder hero typography */
+:root[data-theme=light] .ph-txt h1{font-weight:800;letter-spacing:-.03em}
+:root[data-theme=light] .ph-txt h1 i{font-weight:800}
+:root[data-theme=light] .ph-txt p{font-weight:600}
 
-/* ===== v17: light-mode hero text = same style as dark mode (bold sans + italic serif + lime), kept readable by a soft blue shade, no panel ===== */
-html:root[data-theme=light] .ph-txt{color:#fff}
-html:root[data-theme=light] .ph-txt::before{
-  left:50%;top:-6svh;width:min(1600px,98vw);height:calc(100% + 12svh);border-radius:0;transform:translateX(-50%);
-  background:radial-gradient(58% 62% at 50% 50%,rgba(6,26,74,.66) 0%,rgba(6,26,74,.38) 52%,rgba(6,26,74,0) 80%);
-  backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
-html:root[data-theme=light] .ph-txt h1{font-family:'Inter Tight',Inter,system-ui,sans-serif;font-weight:700;letter-spacing:-.03em;color:#fff;text-shadow:0 2px 22px rgba(0,12,48,.75),0 0 3px rgba(0,12,48,.55)}
-html:root[data-theme=light] .ph-txt h1 i{font-family:Fraunces,Georgia,serif;font-style:italic;font-weight:600;letter-spacing:-.02em}
-html:root[data-theme=light] .ph-txt h1 em{font-style:italic;color:#D4FF3F;text-shadow:0 2px 20px rgba(0,12,48,.8),0 0 3px rgba(0,12,48,.6)}
-html:root[data-theme=light] .ph-txt p{color:#fff;font-weight:500;text-shadow:0 1px 14px rgba(0,12,48,.85),0 0 2px rgba(0,12,48,.6)}
-/* v17 end */
+/* light mode: white hero text with a soft navy glow behind it, so it stays readable over the busy photo */
+:root[data-theme=light] .ph-txt{color:#fff;isolation:isolate}
+:root[data-theme=light] .ph-txt::before{content:'';position:absolute;left:0;right:0;top:-12%;bottom:-18%;z-index:-1;background:radial-gradient(ellipse 62% 58% at 50% 50%,rgba(5,22,66,.62),rgba(5,22,66,.3) 55%,transparent 78%)}
+:root[data-theme=light] .ph-txt h1{color:#fff;text-shadow:0 2px 6px rgba(4,16,52,.55),0 6px 44px rgba(4,16,52,.65)}
+:root[data-theme=light] .ph-txt h1 em{color:#C6F135}
+:root[data-theme=light] .ph-txt p{color:#fff;text-shadow:0 1px 4px rgba(4,16,52,.7),0 3px 24px rgba(4,16,52,.6)}
 
-/* ===== v18: "In motion" cards are real links (whole card clickable) - kept in code, so they no longer disappear ===== */
-a.rv{display:block;color:#fff;text-decoration:none;cursor:pointer}
-.rv .cap{position:absolute;left:0;right:0;bottom:0;padding:54px 26px 24px;display:flex;flex-direction:column;gap:4px;background:linear-gradient(180deg,transparent,rgba(6,13,24,.9))}
-.rv .cap b{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#C6F135;font-weight:600}
-.rv .cap .hd{font:600 clamp(22px,2.2vw,30px)/1.15 'Fraunces',Georgia,serif;color:#fff}
-.rv .cap small{font-size:15px;line-height:1.45;opacity:.88;max-width:48ch;color:#fff}
-.rv .go{margin-top:8px;font:italic 600 18px 'Fraunces',Georgia,serif;color:#fff;transition:transform .2s ease,color .2s ease}
-.rv:hover .go,.rv:focus-visible .go{color:#C6F135;transform:translateX(5px)}
-a.rv:focus-visible{outline:2px solid #C6F135;outline-offset:3px}
-/* v18 end */
+/* photo without the laptop + mouse: fades in as soon as the 3D laptop does, so only ONE laptop is ever visible */
+.ph-bgs{position:absolute;inset:0;opacity:min(1,calc(var(--c,0)*25));pointer-events:none}
+@media(prefers-reduced-motion:reduce){.ph-bgs{display:none}}
+
+/* "See the terminal at work": the whole card is a link to the login page */
+.rv{cursor:pointer}
+.rv-link{position:absolute;inset:0;z-index:3;display:block;border-radius:inherit}
+.rv-link:focus-visible{outline:3px solid #C6F135;outline-offset:-3px}
+.rv figcaption{pointer-events:none;z-index:2}
+.rv-cta{font-style:italic;font-weight:600;margin-top:6px;transition:transform .2s ease}
+.rv:hover .rv-cta{transform:translateX(6px)}
+
+/* Nav: lime "Port." in the logo + lime underline on the current / hovered link */
+.logo .lp{color:var(--acc)}
+:root[data-theme=light] .logo .lp{color:#6FA800}
+:root[data-theme=light] .logo .lp i{color:#6FA800}
+nav.top .nl .nv{position:relative}
+nav.top .nl .nv::after{content:'';position:absolute;left:14px;right:14px;bottom:3px;height:2px;border-radius:2px;background:var(--acc);transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
+:root[data-theme=light] nav.top .nl .nv::after{background:#7FBF00}
+nav.top .nl .nv:hover::after,nav.top .nl .nv:focus-visible::after,nav.top .nl .nv.active::after,nav.top .nl .dd.open>.nv::after{transform:scaleX(1)}
+@media(prefers-reduced-motion:reduce){nav.top .nl .nv::after{transition:none}}
+
+/* Scroll-reveal animations (see components/Animations.tsx): every kind of element gets its own entrance */
+[data-an]{--d:0ms;opacity:0;will-change:transform,opacity,filter;transition:opacity .85s cubic-bezier(.2,.7,.2,1) var(--d),transform .9s cubic-bezier(.2,.7,.2,1) var(--d),filter .9s ease var(--d),clip-path 1s cubic-bezier(.65,0,.2,1) var(--d)}
+[data-an=rise]{transform:translateY(38px);filter:blur(9px)}
+[data-an=left]{transform:translateX(-56px)}
+[data-an=right]{transform:translateX(56px)}
+[data-an=pop]{transform:translateY(26px) scale(.88)}
+[data-an=zoom]{transform:scale(.82);filter:blur(6px)}
+[data-an=flip]{transform:perspective(900px) translateY(44px) rotateX(24deg);transform-origin:50% 100%}
+[data-an=tilt]{transform:perspective(1300px) translateY(50px) rotateX(11deg) scale(.95);transform-origin:50% 100%}
+[data-an=wipe]{opacity:1;clip-path:inset(0 100% 0 0)}
+[data-an].an-in{opacity:1;transform:none;filter:none;clip-path:inset(0 0 0 0)}
+@media(prefers-reduced-motion:reduce){[data-an]{opacity:1!important;transform:none!important;filter:none!important;clip-path:none!important;transition:none!important}}
+
+/* Cards: spring-in with a 3D turn and a light sweep, then a pointer-following tilt + glare on hover */
+[data-an=card]{transform:perspective(1000px) translateY(72px) rotateX(16deg) rotateY(var(--ry0,-14deg)) scale(.86);filter:blur(8px);transform-origin:50% 100%;transition:opacity .7s ease var(--d),filter .8s ease var(--d),transform 1.15s cubic-bezier(.34,1.5,.5,1) var(--d)}
+[data-an=card]::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:4;background:linear-gradient(105deg,transparent 35%,rgba(198,241,53,.55) 50%,transparent 65%);transform:translateX(-120%)}
+[data-an=card].an-in::after{transform:translateX(120%);transition:transform 1.1s ease calc(var(--d) + .45s)}
+.cardtilt{position:relative;--rx:0deg;--ry:0deg;transform:perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));transition:transform .18s ease-out,box-shadow .3s ease;will-change:transform}
+.cardtilt:hover{box-shadow:0 30px 60px -28px rgba(11,27,58,.55),0 0 0 1px rgba(198,241,53,.55)}
+.cardtilt::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:4;opacity:0;transition:opacity .25s ease;background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.22),transparent 55%)}
+.cardtilt:hover::after{opacity:1}
+@media(prefers-reduced-motion:reduce){.cardtilt{transform:none!important}}
+
+/* ---- Hero polish ---- */
+/* photo sits lower in the frame so the laptop + mouse are fully visible (FY in PortHero.tsx must match) */
+.ph-bg .ph-i,.ph-bgs .ph-i{object-position:50% 78%}
+
+/* headline: one font family, smaller, two balanced lines, on a soft navy glow */
+.ph-txt{top:19svh}
+.ph-txt h1{font-family:Fraunces,Georgia,'Times New Roman',serif;font-weight:700;font-size:clamp(34px,4.3vw,70px);line-height:1.06;max-width:14em;letter-spacing:-.02em;text-wrap:balance;color:#fff;text-shadow:0 2px 6px rgba(4,16,52,.6),0 8px 46px rgba(4,16,52,.7)}
+.ph-txt h1 i{font-family:inherit;font-style:normal;font-weight:inherit;letter-spacing:inherit}
+.ph-txt h1 em{font-style:normal;color:#C6F135}
+.ph-txt{color:#fff;isolation:isolate}
+.ph-txt::before{content:'';position:absolute;left:0;right:0;top:-18%;bottom:-30%;z-index:-1;background:radial-gradient(ellipse 58% 60% at 50% 48%,rgba(5,22,66,.7),rgba(5,22,66,.38) 55%,transparent 80%)}
+.ph-txt p{margin-top:1em;font:600 clamp(16px,1.6vw,24px) Inter,system-ui,sans-serif;color:#fff;text-shadow:0 1px 4px rgba(4,16,52,.8),0 3px 22px rgba(4,16,52,.7)}
+
+/* scroll hint: readable on any background, never lost against the laptop */
+.ph .ph-hint,:root[data-theme=light] .ph .ph-hint{bottom:calc(2svh + env(safe-area-inset-bottom,0px));padding:10px 22px 8px;border-radius:999px;background:rgba(6,16,42,.62);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff;box-shadow:0 8px 24px -10px rgba(0,0,0,.5)}
+.ph .ph-hint i,:root[data-theme=light] .ph .ph-hint i{border-color:#C6F135}

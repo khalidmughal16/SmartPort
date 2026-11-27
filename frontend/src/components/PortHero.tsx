@@ -17,6 +17,8 @@ import { useChapterVideos } from '../lib/useChapterVideos'
 // Closed laptop footprint inside each 1672x941 photo: centre x/y and width (px)
 const LAP = { light: { cx: 818, cy: 772, w: 955, mx: 0.641, my: 0.045 }, dark: { cx: 820, cy: 755, w: 950, mx: 0.642, my: 0.063 } }
 
+// photo is bottom-weighted (object-position 50% 78%) so the laptop + mouse are never cropped; keep in sync with app.css
+const FY = 0.78
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
 
@@ -254,11 +256,11 @@ export function PortHero() {
       const w = (L.w * s * 0.96) / 1.03
       el.style.setProperty('--w', w.toFixed(1) + 'px')
       el.style.setProperty('--lx', ((vw - 1672 * s) / 2 + L.cx * s).toFixed(1) + 'px')
-      el.style.setProperty('--ly', ((vh - 941 * s) / 2 + L.cy * s - w * 0.07).toFixed(1) + 'px')
+      el.style.setProperty('--ly', ((vh - 941 * s) * FY + L.cy * s - w * 0.07).toFixed(1) + 'px')
       el.style.setProperty('--dx', (vw / 2 - ((vw - 1672 * s) / 2 + L.cx * s)).toFixed(1) + 'px')
-      el.style.setProperty('--dy', (vh / 2 - ((vh - 941 * s) / 2 + L.cy * s - w * 0.07)).toFixed(1) + 'px')
+      el.style.setProperty('--dy', (vh / 2 - ((vh - 941 * s) * FY + L.cy * s - w * 0.07)).toFixed(1) + 'px')
       el.style.setProperty('--mx', ((vw - 1672 * s) / 2 + (L.cx + L.mx * L.w) * s).toFixed(1) + 'px')
-      el.style.setProperty('--my', ((vh - 941 * s) / 2 + (L.cy + L.my * L.w) * s).toFixed(1) + 'px')
+      el.style.setProperty('--my', ((vh - 941 * s) * FY + (L.cy + L.my * L.w) * s).toFixed(1) + 'px')
       el.style.setProperty('--mw', (L.w * s * 0.18).toFixed(1) + 'px')
       el.style.setProperty('--se', Math.max(vw / (w * 0.976), vh / (w * 0.549)).toFixed(3)) // inner screen covers the viewport
     }

@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { film } from '../lib/film'
+import { Animations } from './Animations'
 import { Features } from './Features'
 import { How } from './How'
 import { Nav } from './Nav'
@@ -40,6 +41,7 @@ export function Home() {
     <div id="home">
       <a href="#main" style={{ position: 'absolute', left: -999 }} onFocus={(e) => (e.currentTarget.style.left = '8px')}>Skip to content</a>
       <Nav />
+      <Animations />
       <PortHero />
       <section className="sec">
         <p className="k">Smarter moves, stronger connections</p>
