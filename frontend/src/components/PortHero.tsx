@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { film } from '../lib/film'
 import { SLIDES } from '../lib/reel'
@@ -15,7 +15,7 @@ import { useChapterVideos } from '../lib/useChapterVideos'
  */
 
 // Closed laptop footprint inside each 1672x941 photo: centre x/y and width (px)
-const LAP = { light: { cx: 813, cy: 696, w: 901 }, dark: { cx: 815, cy: 733, w: 862 } }
+const LAP = { light: { cx: 818, cy: 772, w: 955, mx: 0.641, my: 0.045 }, dark: { cx: 820, cy: 755, w: 950, mx: 0.642, my: 0.063 } }
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const clamp = (v: number) => Math.min(1, Math.max(0, v))
@@ -146,6 +146,59 @@ function ScreenPage({ live }: { live: boolean }) {
 }
 
 
+
+/** Laptop keyboard: dark keys with real legends in a recessed well, proper row layout, faint lime backlight. */
+const KROWS: { h: number; k: number[]; l: string[] }[] = [
+  { h: 0.62, k: [1.5, ...Array(12).fill(1), 1.5], l: ['esc', ...Array.from({ length: 12 }, (_, i) => 'F' + (i + 1)), '\u23FB'] },
+  { h: 1, k: [...Array(13).fill(1), 2], l: ['`', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 'delete'] },
+  { h: 1, k: [1.5, ...Array(12).fill(1), 1.5], l: ['tab', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\'] },
+  { h: 1, k: [1.75, ...Array(11).fill(1), 2.25], l: ['caps lock', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', "'", 'return'] },
+  { h: 1, k: [2.25, ...Array(10).fill(1), 2.75], l: ['shift', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/', 'shift'] },
+  { h: 1, k: [1, 1, 1, 1.25, 5.5, 1.25, 1, 1, 1, 1], l: ['fn', 'ctrl', 'opt', 'cmd', '', 'cmd', 'opt', '\u25C0', '', '\u25B6'] },
+]
+function Keys() {
+  const G = 0.13, PAD = 0.28
+  const out: React.ReactNode[] = []
+  const key = (id: string, x: number, y: number, w: number, h: number) => (
+    <rect key={id} x={x} y={y} width={w} height={h} rx={0.14} fill="url(#kb-key)" stroke="rgba(255,255,255,.16)" strokeWidth={0.025} />
+  )
+  const txt = (id: string, x: number, y: number, t: string, size: number) => (
+    <text key={id} x={x} y={y} textAnchor="middle" dominantBaseline="central" fontFamily="Inter,system-ui,sans-serif" fontWeight={500} fontSize={size} fill="rgba(236,243,251,.88)">{t}</text>
+  )
+  let y = PAD
+  KROWS.forEach((row, r) => {
+    let x = PAD
+    row.k.forEach((kw, c) => {
+      const w = kw - G, kx = x + G / 2, ky = y + G / 2, cx = kx + w / 2
+      const label = row.l[c]
+      if (r === 5 && c === 8) {
+        // up / down: two half-height keys stacked
+        const hh = (row.h - G) / 2 - G / 4
+        out.push(key(`${r}-${c}a`, kx, ky, w, hh), key(`${r}-${c}b`, kx, ky + hh + G / 2, w, hh))
+        out.push(txt(`${r}-${c}ta`, cx, ky + hh / 2, '\u25B2', 0.2), txt(`${r}-${c}tb`, cx, ky + hh + G / 2 + hh / 2, '\u25BC', 0.2))
+      } else {
+        out.push(key(`${r}-${c}`, kx, ky, w, row.h - G))
+        if (label) out.push(txt(`${r}-${c}t`, cx, ky + (row.h - G) / 2, label, row.h < 1 ? 0.2 : label.length === 1 ? 0.38 : label.length <= 3 ? 0.24 : 0.19))
+        // home-row bumps on F and J, like a real keyboard
+        if (label === 'F' || label === 'J') out.push(<rect key={`${r}-${c}b`} x={cx - 0.14} y={ky + row.h - G - 0.16} width={0.28} height={0.04} rx={0.02} fill="rgba(236,243,251,.7)" />)
+      }
+      x += kw
+    })
+    y += row.h
+  })
+  return (
+    <svg viewBox={`0 0 ${15 + PAD * 2} ${y + PAD}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="kb-key" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3a424e" /><stop offset="1" stopColor="#181c22" /></linearGradient>
+        <radialGradient id="kb-glow" cx=".5" cy=".5" r=".6"><stop offset="0" stopColor="#B4F02B" stopOpacity=".26" /><stop offset="1" stopColor="#B4F02B" stopOpacity="0" /></radialGradient>
+      </defs>
+      <rect width={15 + PAD * 2} height={y + PAD} rx={0.3} fill="#0b0e12" />
+      <rect width={15 + PAD * 2} height={y + PAD} rx={0.3} fill="url(#kb-glow)" />
+      {out}
+    </svg>
+  )
+}
+
 /**
  * What the laptop screen shows while it opens and zooms (until we are "inside" the screen): a branded wallpaper.
  * Dark mode uses the green-wave wallpaper (public/hero/wall-dark.jpg); light mode a matching light wallpaper (SVG, crisp at any size).
@@ -204,6 +257,9 @@ export function PortHero() {
       el.style.setProperty('--ly', ((vh - 941 * s) / 2 + L.cy * s - w * 0.07).toFixed(1) + 'px')
       el.style.setProperty('--dx', (vw / 2 - ((vw - 1672 * s) / 2 + L.cx * s)).toFixed(1) + 'px')
       el.style.setProperty('--dy', (vh / 2 - ((vh - 941 * s) / 2 + L.cy * s - w * 0.07)).toFixed(1) + 'px')
+      el.style.setProperty('--mx', ((vw - 1672 * s) / 2 + (L.cx + L.mx * L.w) * s).toFixed(1) + 'px')
+      el.style.setProperty('--my', ((vh - 941 * s) / 2 + (L.cy + L.my * L.w) * s).toFixed(1) + 'px')
+      el.style.setProperty('--mw', (L.w * s * 0.18).toFixed(1) + 'px')
       el.style.setProperty('--se', Math.max(vw / (w * 0.976), vh / (w * 0.549)).toFixed(3)) // inner screen covers the viewport
     }
     const tick = () => {
@@ -244,6 +300,7 @@ export function PortHero() {
     <section className="ph" ref={ref} aria-label="SmartPort">
       <div className="ph-stage">
         <div className="ph-bg"><Pic /></div>
+        <div className="ph-bgs" aria-hidden="true"><Pic screen /></div>
         <div className="ph-veil" />
 
         <div className="ph-txt">
@@ -251,10 +308,12 @@ export function PortHero() {
           <p>One intelligent platform. Complete terminal control.</p>
         </div>
 
+        <div className="ph-mouse" aria-hidden="true" />
+
         <div className="ph-scene">
           <div className="ph-rig">
             <div className="ph-sh" />
-            <div className="ph-base"><div className="ph-key" /><div className="ph-pad" /></div>
+            <div className="ph-base"><div className="ph-key"><Keys /></div><div className="ph-pad" /></div>
             <div className="ph-edge" />
             <div className="ph-lid">
               <div className="ph-scr">
